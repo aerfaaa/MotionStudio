@@ -38,6 +38,13 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+      - name: Upload Simulator App
+        uses: actions/upload-artifact@v4
+        with:
+          name: MotionStudio-Simulator-App
+          path: build/Build/Products/Debug-iphonesimulator/*.app
+          if-no-files-found: error
+
       - name: Upload build log if build fails
         if: failure()
         uses: actions/upload-artifact@v4
