@@ -34,7 +34,7 @@ jobs:
             -scheme MotionStudio \
             -sdk iphonesimulator \
             -configuration Debug \
-            -derivedDataPath build \
+            -derivedDataPath build-simulator \
             CODE_SIGNING_ALLOWED=NO \
             build
 
@@ -42,15 +42,40 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MotionStudio-Simulator-App
-          path: build/Build/Products/Debug-iphonesimulator/*.app
+          path: build-simulator/Build/Products/Debug-iphonesimulator/*.app
           if-no-files-found: error
 
-      - name: Upload build log if build fails
+      - name: Build for physical iPhone and iPad
+        run: |
+          xcodebuild \
+            -project MotionStudio.xcodeproj \
+            -scheme MotionStudio \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build-device \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p ipa/Payload
+          cp -R build-device/Build/Products/Release-iphoneos/MotionStudio.app ipa/Payload/
+          cd ipa
+          zip -r ../MotionStudio-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: MotionStudio-unsigned-IPA
+          path: MotionStudio-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Upload build logs if build fails
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-failure-logs
           path: |
-            build/Logs/
-            *.log
+            build-simulator/Logs/
+            build-device/Logs/
           if-no-files-found: ignore
