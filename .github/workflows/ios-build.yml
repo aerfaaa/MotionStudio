@@ -1,0 +1,49 @@
+
+name: Build Motion Studio
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$XCODE_PATH" ]; then
+            XCODE_PATH=$(xcode-select -p | sed 's#/Contents/Developer##')
+          fi
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer" 2>/dev/null || true
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild \
+            -project MotionStudio.xcodeproj \
+            -scheme MotionStudio \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload build log if build fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-logs
+          path: |
+            build/Logs/
+            *.log
+          if-no-files-found: ignore
