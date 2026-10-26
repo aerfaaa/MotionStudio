@@ -8,4 +8,7 @@ public enum EditError: Error, Equatable {
     case duplicateLayerID
     case invalidProperty
     case invalidTiming
+    case keyframeNotFound
+    case keyframeOccupied
+    case invalidValue
 }

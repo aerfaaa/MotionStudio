@@ -6,6 +6,7 @@ import MotionCore
 @MainActor
 struct InspectorView: View {
     let model: EditorModel
+    @State private var scaleLinked = true
 
     var body: some View {
         if let layer = model.selectedLayer {
@@ -18,10 +19,12 @@ struct InspectorView: View {
 
                     VStack(spacing: 6) {
                         positionRow(layer)
-                        sliderRow(layer, key: .scale, range: 0.05...4, unit: 100, suffix: "%")
+                        scaleRow(layer)
                         sliderRow(layer, key: .rotation, range: -360...360, unit: 1, suffix: "°")
                         sliderRow(layer, key: .opacity, range: 0...1, unit: 100, suffix: "%")
                     }
+
+                    keyframeSection(layer)
 
                     HStack(spacing: 10) {
                         actionButton("Duplicate", systemName: "plus.square.on.square") { model.duplicateSelected() }
@@ -93,7 +96,7 @@ struct InspectorView: View {
             get: { current },
             set: { newValue in
                 if key.isVector {
-                    // V1 scales evenly. Separate width and height scaling comes later.
+                    // Only used for properties that hold a single number in the slider (none at present).
                     model.setVector(key, of: layer.id, to: Vec2(x: newValue, y: newValue), coalescing: true)
                 } else {
                     model.setScalar(key, of: layer.id, to: newValue, coalescing: true)
@@ -117,6 +120,104 @@ struct InspectorView: View {
                 if !editing { model.endEditGroup() }
             })
             .accessibilityLabel(key.displayName)
+        }
+    }
+
+    /// Width and height scale as separate numbers, with a link button to keep them equal.
+    private func scaleRow(_ layer: Layer) -> some View {
+        let value = layer.vectorValue(.scale, at: model.currentTime) ?? .one
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(PropertyKey.scale.displayName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                Button { scaleLinked.toggle() } label: {
+                    Image(systemName: "link")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(scaleLinked ? Theme.accent : Theme.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(scaleLinked ? "Width and height linked" : "Width and height separate")
+                KeyframeButton(state: keyframeState(layer, .scale), propertyName: "scale") {
+                    model.toggleKeyframe(.scale, layerID: layer.id)
+                }
+            }
+            HStack(spacing: 10) {
+                NumberField(title: "X %", value: value.x * 100) { percent in
+                    let x = percent / 100
+                    model.setVector(.scale, of: layer.id, to: Vec2(x: x, y: scaleLinked ? x : value.y), coalescing: false)
+                }
+                NumberField(title: "Y %", value: value.y * 100) { percent in
+                    let y = percent / 100
+                    model.setVector(.scale, of: layer.id, to: Vec2(x: scaleLinked ? y : value.x, y: y), coalescing: false)
+                }
+            }
+        }
+    }
+
+    /// Easing, copy, paste and delete for the keyframe selected in the timeline.
+    private func keyframeSection(_ layer: Layer) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Keyframes")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                IconButton(systemName: "chevron.left", label: "Previous keyframe") { model.jumpToKeyframe(forward: false) }
+                IconButton(systemName: "chevron.right", label: "Next keyframe") { model.jumpToKeyframe(forward: true) }
+            }
+
+            if let reference = model.selectedKeyframe, reference.layerID == layer.id,
+               let snapshot = model.selectedKeyframeSnapshot {
+                let frame = model.composition.frameRate.frameIndex(at: reference.time)
+                let isLast = layer.keyframeSnapshots(reference.property).last?.time == reference.time
+                Text("\(reference.property.displayName) keyframe at frame \(frame)")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(EasingPreset.allCases) { preset in
+                            let isCurrent = EasingPreset.matching(snapshot.outgoing) == preset
+                            Button { model.setSelectedKeyframeEasing(preset) } label: {
+                                Text(preset.displayName)
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(isCurrent ? Color.white : Theme.textPrimary)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 36)
+                                    .background(isCurrent ? Theme.accent : Theme.surfaceRaised, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                EasingCurveView(interpolation: snapshot.outgoing)
+
+                Text(isLast
+                     ? "This is the last keyframe, so its easing has no effect until another keyframe follows."
+                     : "Easing shapes the movement from this keyframe to the next one.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+
+                HStack(spacing: 10) {
+                    actionButton("Copy", systemName: "doc.on.doc") { model.copySelectedKeyframe() }
+                    actionButton("Paste", systemName: "doc.on.clipboard") { model.pasteKeyframe() }
+                        .opacity(model.copiedKeyframe == nil ? 0.4 : 1)
+                        .disabled(model.copiedKeyframe == nil)
+                    actionButton("Delete", systemName: "trash", isDestructive: true) { model.deleteSelectedKeyframe() }
+                }
+            } else {
+                Text("Tap a diamond in the timeline to select a keyframe, then change its easing here. Use the diamonds beside each property to add keyframes.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                if model.copiedKeyframe != nil {
+                    actionButton("Paste at playhead", systemName: "doc.on.clipboard") { model.pasteKeyframe() }
+                }
+            }
         }
     }
 

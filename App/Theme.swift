@@ -1,23 +1,61 @@
 import SwiftUI
+import UIKit
 import MotionCore
 
 /// Colours, sizes and small helpers shared by every screen.
 /// A calm graphite workspace: the composition is the brightest thing on screen,
 /// the interface stays quiet, and amber is reserved for keyframes.
 enum Theme {
-    static let background = Color(red: 0.063, green: 0.067, blue: 0.082)
-    static let surface = Color(red: 0.102, green: 0.109, blue: 0.133)
-    static let surfaceRaised = Color(red: 0.148, green: 0.157, blue: 0.188)
-    static let hairline = Color.white.opacity(0.08)
-    static let accent = Color(red: 0.39, green: 0.55, blue: 1.0)
-    static let keyframe = Color(red: 1.0, green: 0.76, blue: 0.28)
-    static let textPrimary = Color.white.opacity(0.95)
-    static let textSecondary = Color.white.opacity(0.58)
-    static let success = Color(red: 0.36, green: 0.82, blue: 0.58)
-    static let danger = Color(red: 1.0, green: 0.42, blue: 0.40)
+    /// A colour that changes with the Light / Dark appearance.
+    private static func adaptive(dark: UIColor, light: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in traits.userInterfaceStyle == .dark ? dark : light })
+    }
+
+    private static func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> UIColor {
+        UIColor(red: r, green: g, blue: b, alpha: a)
+    }
+
+    static let background = adaptive(dark: rgb(0.063, 0.067, 0.082), light: rgb(0.945, 0.949, 0.965))
+    static let surface = adaptive(dark: rgb(0.102, 0.109, 0.133), light: rgb(1.0, 1.0, 1.0))
+    static let surfaceRaised = adaptive(dark: rgb(0.148, 0.157, 0.188), light: rgb(0.925, 0.929, 0.949))
+    static let hairline = adaptive(dark: UIColor(white: 1, alpha: 0.08), light: UIColor(white: 0, alpha: 0.10))
+    static let accent = adaptive(dark: rgb(0.39, 0.55, 1.0), light: rgb(0.20, 0.38, 0.92))
+    static let keyframe = adaptive(dark: rgb(1.0, 0.76, 0.28), light: rgb(0.86, 0.55, 0.02))
+    static let textPrimary = adaptive(dark: UIColor(white: 1, alpha: 0.95), light: UIColor(white: 0.08, alpha: 0.95))
+    static let textSecondary = adaptive(dark: UIColor(white: 1, alpha: 0.58), light: UIColor(white: 0.1, alpha: 0.58))
+    static let success = adaptive(dark: rgb(0.36, 0.82, 0.58), light: rgb(0.10, 0.62, 0.36))
+    static let danger = adaptive(dark: rgb(1.0, 0.42, 0.40), light: rgb(0.85, 0.18, 0.16))
 
     static let panelRadius: CGFloat = 18
     static let controlRadius: CGFloat = 11
+}
+
+/// The appearance choice in Settings. Saved with @AppStorage under the key "appearance".
+enum AppearanceSetting: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    static let storageKey = "appearance"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    /// nil means "follow the system".
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
 }
 
 /// Starting colours for new layers.

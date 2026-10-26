@@ -19,3 +19,10 @@ Short records of choices that are hard to change later.
 15. **iOS 17 minimum** for the Observation framework. Revisit if you need older devices.
 16. **MIT license.** Permissive and App Store friendly. This is not legal advice; check dependencies when any are added (V1 has none).
 17. **Placeholder identity:** name "Motion Studio", bundle ID `com.example.motionstudio`. Change before any public release.
+18. **Keyframe edits are commands** (`MoveKeyframe`, `SetKeyframeInterpolation`, `InsertKeyframe`), so undo, saving and drags work like every other edit. A drag is one undo step.
+19. **Keyframes are selected and dragged in the timeline lanes with one gesture per lane**, not one per diamond, because a diamond is recreated when its time changes and would lose the drag.
+20. **Easing is one cubic Bezier per segment.** Independent in and out handles, and spatial paths, need a model change and are deferred.
+21. **The effect catalogue is generated from the specification's list** and an independent test holds a second copy. Every effect is `missing` until it renders, and a test enforces that.
+22. **Liquid Glass is deferred.** It cannot be verified without a compiler and could break the only build we have.
+23. **Theme colours are dynamic** so light and dark share one set of names.
+24. **The timeline size is stored as a fraction of the screen height** so it adapts across devices.

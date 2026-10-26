@@ -9,6 +9,13 @@ enum SaveState: Equatable {
     case failed
 }
 
+/// Points at one keyframe: which layer, which property, and when.
+struct KeyframeRef: Equatable {
+    var layerID: UUID
+    var property: PropertyKey
+    var time: Time
+}
+
 enum NewLayerKind {
     case rectangle
     case ellipse
@@ -36,6 +43,10 @@ final class EditorModel {
     private(set) var redoName: String?
     private(set) var saveState: SaveState = .saved
     var lastError: String?
+    /// The keyframe being edited, if any.
+    private(set) var selectedKeyframe: KeyframeRef?
+    /// The last copied keyframe, ready to paste.
+    private(set) var copiedKeyframe: (property: PropertyKey, snapshot: KeyframeSnapshot)?
 
     // MARK: Internals (not watched by the UI)
 
@@ -71,6 +82,7 @@ final class EditorModel {
 
     func select(_ id: UUID?) {
         selectedLayerID = id
+        if selectedKeyframe?.layerID != id { selectedKeyframe = nil }
     }
 
     func addLayer(_ kind: NewLayerKind) {
@@ -163,6 +175,94 @@ final class EditorModel {
         } else {
             run(AddKeyframe(compositionID: compositionID, layerID: layerID, property: key, time: time))
         }
+    }
+
+    // MARK: Keyframes
+
+    /// Selects a keyframe and moves the playhead onto it.
+    func selectKeyframe(layerID: UUID, property: PropertyKey, time: Time) {
+        selectedLayerID = layerID
+        selectedKeyframe = KeyframeRef(layerID: layerID, property: property, time: time)
+        if isPlaying { pause() }
+        currentFrame = min(max(composition.frameRate.frameIndex(at: time), 0), max(0, frameCount - 1))
+    }
+
+    func clearKeyframeSelection() {
+        selectedKeyframe = nil
+    }
+
+    /// The selected keyframe as stored in the project, if it still exists.
+    var selectedKeyframeSnapshot: KeyframeSnapshot? {
+        guard let ref = selectedKeyframe, let layer = composition.layer(withID: ref.layerID) else { return nil }
+        return layer.keyframeSnapshot(ref.property, at: ref.time)
+    }
+
+    /// Moves the selected keyframe to a frame. While dragging, all moves merge into one undo step.
+    /// A move onto a frame that already has a keyframe is quietly ignored.
+    func moveSelectedKeyframe(toFrame frame: Int64) {
+        guard let ref = selectedKeyframe else { return }
+        let clamped = min(max(frame, 0), max(0, frameCount - 1))
+        let newTime = composition.frameRate.time(ofFrame: clamped)
+        guard newTime != ref.time else { return }
+        if isPlaying { pause() }
+        let command = MoveKeyframe(compositionID: compositionID, layerID: ref.layerID, property: ref.property,
+                                   from: ref.time, to: newTime,
+                                   coalescingKey: "keyframe-drag-\(ref.layerID.uuidString)-\(ref.property.rawValue)")
+        do {
+            try document.perform(command)
+            // Follow the keyframe before refresh() checks that the selection still exists.
+            selectedKeyframe?.time = newTime
+            currentFrame = clamped
+            refresh()
+        } catch {
+            // Refused (another keyframe is already there): keep everything as it was.
+        }
+    }
+
+    func deleteSelectedKeyframe() {
+        guard let ref = selectedKeyframe else { return }
+        run(RemoveKeyframe(compositionID: compositionID, layerID: ref.layerID,
+                           property: ref.property, time: ref.time))
+        selectedKeyframe = nil
+    }
+
+    func setSelectedKeyframeEasing(_ preset: EasingPreset) {
+        guard let ref = selectedKeyframe else { return }
+        run(SetKeyframeInterpolation(compositionID: compositionID, layerID: ref.layerID,
+                                     property: ref.property, time: ref.time,
+                                     interpolation: preset.interpolation))
+    }
+
+    func copySelectedKeyframe() {
+        guard let ref = selectedKeyframe, let snapshot = selectedKeyframeSnapshot else { return }
+        copiedKeyframe = (ref.property, snapshot)
+    }
+
+    /// Pastes the copied keyframe at the playhead on the selected layer.
+    func pasteKeyframe() {
+        guard let copied = copiedKeyframe, let layerID = selectedLayerID else { return }
+        var snapshot = copied.snapshot
+        snapshot.time = currentTime
+        run(InsertKeyframe(compositionID: compositionID, layerID: layerID,
+                           property: copied.property, snapshot: snapshot))
+        selectedKeyframe = KeyframeRef(layerID: layerID, property: copied.property, time: snapshot.time)
+    }
+
+    /// Moves the playhead to the previous or next keyframe of the selected layer.
+    func jumpToKeyframe(forward: Bool) {
+        guard let layer = selectedLayer else { return }
+        let now = currentTime
+        let target = forward
+            ? layer.keyframeTimes.first(where: { $0 > now })
+            : layer.keyframeTimes.last(where: { $0 < now })
+        if let target { seek(toFrame: composition.frameRate.frameIndex(at: target)) }
+    }
+
+    // MARK: Composition settings
+
+    func applyCompositionSettings(width: Int, height: Int, frameRate: FrameRate, durationSeconds: Double) {
+        run(SetCompositionSettings(compositionID: compositionID, width: width, height: height,
+                                   frameRate: frameRate, durationSeconds: durationSeconds))
     }
 
     // MARK: Undo and redo
@@ -261,6 +361,10 @@ final class EditorModel {
         redoName = document.redoName
         if let id = selectedLayerID, composition.layer(withID: id) == nil {
             selectedLayerID = nil
+        }
+        if let ref = selectedKeyframe,
+           composition.layer(withID: ref.layerID)?.hasKeyframe(ref.property, at: ref.time) != true {
+            selectedKeyframe = nil
         }
         let lastFrame = max(0, frameCount - 1)
         if currentFrame > lastFrame { currentFrame = lastFrame }

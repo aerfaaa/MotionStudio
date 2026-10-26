@@ -1,23 +1,19 @@
 # Roadmap
 
-Each step ends in something you can see or test.
+Status labels as in `FEATURE-STATUS.md`. Nothing is Working until it has been built and tested.
 
-**V1 (this ZIP): foundation.** Done when: MotionCore tests pass in GitHub Actions; the app builds; on your iPhone you can create a project, add shapes, drag them, set position and opacity keyframes, play, undo, close, reopen and find the same project.
+| Phase | Content | Status |
+|---|---|---|
+| V1 foundation | Core, timeline, keyframes, undo, saving, preview | Partial. Written, not built. |
+| A. Editor reliability | Timeline resize and collapse, keyframe workflow, X/Y scale, custom sizes, composition settings | Partial. Done this pass: keyframe selecting, moving, copy and paste, easing, scale X/Y, resizable timeline, composition settings. Missing: timeline zoom and scroll, markers, layer trimming interface, migrations, crash recovery. |
+| B. Project and interface | Home screen, appearance | Partial. Done: thumbnails, rename, duplicate, System/Light/Dark. Missing: package import and export, Liquid Glass. |
+| C. Media and typography | Import, fonts, text | Missing |
+| D. Rendering and export | Metal renderer, MP4 export | Missing |
+| E. Effects | Registry (done), rendering (0 of 167), effect panel, presets | Registry Partial. Rest Missing. |
+| F. Advanced animation | Graph editor UI, motion paths, precomps, expressions, time remapping | Maths Partial. Rest Missing. |
+| G. Compositing | Masks, mattes, keying, tracking, 3D | Missing. 3D is blocked on a matrix design. |
 
-**V1.1: tidy-up from the first real run.** Fix compile errors, layout problems and anything the screenshots show.
+## Next milestone
 
-**V2: Metal preview.** Replace Canvas with an MTKView renderer for the same `ResolvedFrame`. Done when: it matches the Canvas output on the demo project and holds 60 fps with 20 layers.
-
-**V3: media.** Import from Photos and Files into `media/`, image layers, then video layers (AVAssetReader, frame-accurate), audio and waveforms. Done when: a 10-second clip stays in sync at 29.97 and 59.94 fps.
-
-**V4: export.** Offscreen render of every frame into AVAssetWriter, at 24 to 60 fps and above. Done when: the exported file's frame count and duration match the composition exactly.
-
-**V5: first effects.** Blur, glow, colour correction, chromatic aberration, grain, as built-in GPU effects with animatable parameters and stackable per layer. Done when: each effect visibly changes both preview and export.
-
-**V6: compositing.** Masks, track mattes, blend mode picker, adjustment layers, precompositions.
-
-**V7: animation tools.** Graph editor, custom easing, motion paths, layer trimming and time remapping.
-
-**V8: expressions and presets.** Small expression language, effect presets, animation presets.
-
-**V9: extension SDK.** Effect graph format for third-party effects built from built-in operations.
+1. Run the workflows, fix whatever the compiler reports, and read the simulator screenshots.
+2. Then, in order: the first rendered effects through the Canvas renderer (Gaussian Blur, Brightness / Contrast, Hue Shift, Invert map onto Canvas filters), the effect panel, then the Metal renderer and export.

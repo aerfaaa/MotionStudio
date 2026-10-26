@@ -65,6 +65,22 @@ Saves happen 0.7 seconds after the last change, when the app leaves the foregrou
 one (`hold`, `linear` or a cubic Bezier ease). Editing a property that already has keyframes creates a keyframe at the
 current time (auto-keyframing); otherwise it changes the fixed value.
 
+## Keyframe editing and graph maths
+
+Keyframes can be moved (`MoveKeyframe`), given new easing (`SetKeyframeInterpolation`) and pasted (`InsertKeyframe`). `KeyframeValue` and `KeyframeSnapshot` carry a keyframe of either kind of property. `BezierEase.derivative` and `AnimatedProperty.speed(at:)` provide the Speed Graph maths. See `GRAPH-EDITOR.md`.
+
+## Effects
+
+`EffectRegistry` lists every required effect name with a category, a status and, for some, setting definitions. `EffectInstance` (stored on layers) holds the settings; the evaluator resolves them per frame. Nothing renders them yet. See `EFFECTS-CATALOG.md`.
+
+## Composition settings
+
+`SetCompositionSettings` changes size, frame rate and length in one undoable step. Layers keep their pixel values. Lengths are whole frames. Layers that ended at the old end follow the new end.
+
+## Appearance
+
+`Theme` colours are dynamic (light and dark). The choice System, Light or Dark is saved with `@AppStorage("appearance")` and applied with `preferredColorScheme`.
+
 ## Extension points
 
 | To add... | Where | What else changes |

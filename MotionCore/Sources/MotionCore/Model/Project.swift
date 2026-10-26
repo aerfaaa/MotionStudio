@@ -29,10 +29,7 @@ public struct Project: Codable, Equatable {
                                height: Int = 1080,
                                frameRate: FrameRate = .fps30,
                                durationSeconds: Double = 5) -> Project {
-        // A duration is always a whole number of frames, rounded to the nearest frame
-        // (5 seconds at 29.97 fps is 150 frames, which is 5.005 seconds).
-        let frames = max(1, Int64((durationSeconds * frameRate.framesPerSecond).rounded()))
-        let duration = frameRate.time(ofFrame: frames)
+        let duration = Composition.wholeFrameDuration(seconds: durationSeconds, frameRate: frameRate)
         let composition = Composition(name: "Main", width: width, height: height,
                                       frameRate: frameRate, duration: duration)
         return Project(name: name, rootCompositionID: composition.id, compositions: [composition])

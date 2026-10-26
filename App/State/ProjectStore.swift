@@ -14,8 +14,30 @@ struct ProjectEntry: Identifiable, Hashable {
 struct NewProjectSettings {
     var name = "Untitled"
     var resolution = ResolutionPreset.all[0]
+    var useCustomSize = false
+    var customWidth = 1920
+    var customHeight = 1080
     var frameRate = FrameRateOption.all.first(where: { $0.rate == .fps30 }) ?? FrameRateOption.all[0]
     var durationSeconds = 5.0
+
+    var width: Int { useCustomSize ? customWidth : resolution.width }
+    var height: Int { useCustomSize ? customHeight : resolution.height }
+
+    var isValid: Bool {
+        let sizes = SetCompositionSettings.minimumSize...SetCompositionSettings.maximumSize
+        return sizes.contains(width) && sizes.contains(height) && durationSeconds > 0
+    }
+}
+
+enum ProjectStoreError: LocalizedError {
+    case invalidSize
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidSize:
+            return "The size must be between \(SetCompositionSettings.minimumSize) and \(SetCompositionSettings.maximumSize) pixels."
+        }
+    }
 }
 
 /// Finds, creates and deletes project folders in the app's Documents/Projects folder.
@@ -47,11 +69,12 @@ final class ProjectStore {
     }
 
     func create(_ settings: NewProjectSettings) throws -> (entry: ProjectEntry, project: Project) {
+        guard settings.isValid else { throw ProjectStoreError.invalidSize }
         let folder = uniqueFolderURL(for: settings.name)
         let displayName = folder.deletingPathExtension().lastPathComponent
         let project = Project.makeNew(name: displayName,
-                                      width: settings.resolution.width,
-                                      height: settings.resolution.height,
+                                      width: settings.width,
+                                      height: settings.height,
                                       frameRate: settings.frameRate.rate,
                                       durationSeconds: settings.durationSeconds)
         try ProjectFile.save(project, toFolder: folder)
@@ -72,6 +95,30 @@ final class ProjectStore {
 
     func load(_ entry: ProjectEntry) throws -> Project {
         try ProjectFile.load(fromFolder: entry.url)
+    }
+
+    /// Gives a project a new name (its folder and the name inside the file).
+    func rename(_ entry: ProjectEntry, to newName: String) throws {
+        let cleaned = ProjectStore.sanitised(newName)
+        guard cleaned != entry.name else { return }
+        let destination = uniqueFolderURL(for: cleaned)
+        try FileManager.default.moveItem(at: entry.url, to: destination)
+        try renameInside(destination)
+        reload()
+    }
+
+    /// Makes a copy of a project, including its media folder.
+    func duplicate(_ entry: ProjectEntry) throws {
+        let destination = uniqueFolderURL(for: entry.name + " copy")
+        try FileManager.default.copyItem(at: entry.url, to: destination)
+        try renameInside(destination)
+        reload()
+    }
+
+    private func renameInside(_ folder: URL) throws {
+        var project = try ProjectFile.load(fromFolder: folder)
+        project.name = folder.deletingPathExtension().lastPathComponent
+        try ProjectFile.save(project, toFolder: folder)
     }
 
     func delete(_ entry: ProjectEntry) {

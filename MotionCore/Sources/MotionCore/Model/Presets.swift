@@ -39,10 +39,12 @@ public struct ResolutionPreset: Identifiable, Hashable, Sendable {
     }
 
     public static let all: [ResolutionPreset] = [
-        ResolutionPreset(label: "Full HD, 1920 x 1080", width: 1920, height: 1080),
-        ResolutionPreset(label: "Vertical, 1080 x 1920", width: 1080, height: 1920),
-        ResolutionPreset(label: "Square, 1080 x 1080", width: 1080, height: 1080),
-        ResolutionPreset(label: "HD, 1280 x 720", width: 1280, height: 720),
-        ResolutionPreset(label: "4K UHD, 3840 x 2160", width: 3840, height: 2160),
+        ResolutionPreset(label: "16:9 Landscape, 1920 x 1080", width: 1920, height: 1080),
+        ResolutionPreset(label: "9:16 Vertical, 1080 x 1920", width: 1080, height: 1920),
+        ResolutionPreset(label: "1:1 Square, 1080 x 1080", width: 1080, height: 1080),
+        ResolutionPreset(label: "4:5 Portrait, 1080 x 1350", width: 1080, height: 1350),
+        ResolutionPreset(label: "3:4 Portrait, 1080 x 1440", width: 1080, height: 1440),
+        ResolutionPreset(label: "16:9 HD, 1280 x 720", width: 1280, height: 720),
+        ResolutionPreset(label: "16:9 4K UHD, 3840 x 2160", width: 3840, height: 2160),
     ]
 }

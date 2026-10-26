@@ -11,6 +11,9 @@ struct TimelinePanel: View {
     private let rowHeight: CGFloat = 46
     private let rulerHeight: CGFloat = 38
 
+    /// The properties listed under the selected layer.
+    static let shownProperties: [PropertyKey] = [.position, .scale, .rotation, .opacity]
+
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
@@ -54,6 +57,13 @@ struct TimelinePanel: View {
                                              rowHeight: rowHeight,
                                              onSelect: { model.select(layer.id) },
                                              onToggleVisibility: { model.setVisibility(layer.id, to: !layer.isVisible) })
+                                    // The selected layer opens up to show each property's keyframes.
+                                    if layer.id == model.selectedLayerID {
+                                        ForEach(TimelinePanel.shownProperties, id: \.self) { key in
+                                            PropertyTrackRow(model: model, layer: layer, key: key,
+                                                             pointsPerSecond: pointsPerSecond, labelWidth: labelWidth)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -166,5 +176,104 @@ private struct LayerRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// One property of the selected layer: a lane of keyframe diamonds.
+/// Tap a diamond to select it. Drag it sideways to retime it (it snaps to whole frames).
+/// Tap empty space in the lane to clear the selection.
+private struct PropertyTrackRow: View {
+    let model: EditorModel
+    let layer: Layer
+    let key: PropertyKey
+    let pointsPerSecond: CGFloat
+    let labelWidth: CGFloat
+
+    @State private var started = false
+    @State private var grabbed: Time?
+    @State private var moving = false
+
+    var body: some View {
+        let snapshots = layer.keyframeSnapshots(key)
+        HStack(spacing: 0) {
+            Text(key.displayName)
+                .font(.caption)
+                .foregroundStyle(Theme.textSecondary)
+                .padding(.leading, 48)
+                .frame(width: labelWidth, alignment: .leading)
+
+            ZStack(alignment: .leading) {
+                Rectangle().fill(Color.clear)
+                ForEach(snapshots, id: \.time) { snapshot in
+                    diamond(at: snapshot.time)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !started {
+                            started = true
+                            grabbed = nearestKeyframe(toX: value.startLocation.x, in: snapshots)
+                            if let time = grabbed {
+                                model.selectKeyframe(layerID: layer.id, property: key, time: time)
+                            }
+                        }
+                        guard grabbed != nil else { return }
+                        // A tap must not move anything: wait until the finger has really moved.
+                        if !moving && abs(value.translation.width) < 6 { return }
+                        moving = true
+                        model.moveSelectedKeyframe(toFrame: frame(forX: value.location.x))
+                    }
+                    .onEnded { _ in
+                        if grabbed == nil {
+                            model.clearKeyframeSelection()
+                        } else if moving {
+                            model.endEditGroup()
+                        }
+                        started = false
+                        grabbed = nil
+                        moving = false
+                    }
+            )
+        }
+        .frame(height: 36)
+        .background(Theme.surfaceRaised.opacity(0.5))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(key.displayName) keyframes, \(snapshots.count)")
+    }
+
+    private func diamond(at time: Time) -> some View {
+        let isSelected = model.selectedKeyframe == KeyframeRef(layerID: layer.id, property: key, time: time)
+        return Image(systemName: "diamond.fill")
+            .font(.system(size: isSelected ? 16 : 12))
+            .foregroundStyle(Theme.keyframe)
+            .overlay {
+                if isSelected {
+                    Image(systemName: "diamond")
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                }
+            }
+            .frame(width: 30, height: 36)
+            .offset(x: CGFloat(time.seconds) * pointsPerSecond - 15)
+            .allowsHitTesting(false)
+    }
+
+    private func xPosition(of time: Time) -> CGFloat {
+        CGFloat(time.seconds) * pointsPerSecond
+    }
+
+    private func nearestKeyframe(toX x: CGFloat, in snapshots: [KeyframeSnapshot]) -> Time? {
+        let best = snapshots.min(by: { abs(xPosition(of: $0.time) - x) < abs(xPosition(of: $1.time) - x) })
+        guard let best, abs(xPosition(of: best.time) - x) <= 24 else { return nil }
+        return best.time
+    }
+
+    private func frame(forX x: CGFloat) -> Int64 {
+        let seconds = Double(max(0, x) / max(pointsPerSecond, 0.001))
+        return model.composition.frameRate.frameIndex(at: Time(seconds: seconds))
     }
 }

@@ -55,6 +55,17 @@ A browser window may ask you to sign in to GitHub. If `git init -b main` is not 
    - `MotionStudio-unsigned-ipa` is the app file.
    - `simulator-screenshots` has pictures of the app on an iPhone and an iPad simulator (this job may fail on its own without stopping the rest).
 
+### What each result proves
+
+| Result | It means | It does NOT mean |
+|---|---|---|
+| Core tests green | The MotionCore logic compiles and its tests pass | The app builds |
+| Simulator screenshots | The app compiled for the simulator, launched and drew something | It works on your iPhone |
+| Unsigned .ipa produced | The app compiles for devices | It can be installed (it must be signed first) |
+| Installed and opens on your iPhone | You have tested the app on a device | Everything inside it works |
+
+When a run fails, download the **build-logs** or **core-tests-log** artifact (the first lines with `error:` are the ones to send), or copy the red lines from the failed step.
+
 ## 5. Install on your iPhone (free route, with limits)
 
 The downloaded app is **unsigned**. An iPhone will not run it until it is signed with an Apple ID.

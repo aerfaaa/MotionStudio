@@ -16,6 +16,11 @@ struct EditorScreen: View {
     @State private var model: EditorModel
     @State private var tab: LowerTab = .timeline
     @Environment(\.scenePhase) private var scenePhase
+    // The timeline panel's size is remembered between sessions.
+    @AppStorage("timelinePanelFraction") private var panelFraction: Double = 0.55
+    @AppStorage("timelineCollapsed") private var timelineCollapsed = false
+    @State private var dragStartHeight: CGFloat?
+    @State private var showingCompositionSettings = false
     let onClose: () -> Void
 
     init(model: EditorModel, onClose: @escaping () -> Void) {
@@ -37,6 +42,9 @@ struct EditorScreen: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { model.saveNow() }
         }
+        .sheet(isPresented: $showingCompositionSettings) {
+            CompositionSettingsSheet(model: model)
+        }
         .alert("Something went wrong",
                isPresented: .constant(model.lastError != nil),
                actions: { Button("OK") { model.lastError = nil } },
@@ -57,33 +65,88 @@ struct EditorScreen: View {
     }
 
     private func stackedLayout(size: CGSize) -> some View {
-        VStack(spacing: 8) {
+        let available = max(300, size.height - 70)          // what is left under the top bar
+        let handleHeight: CGFloat = 28
+        let collapsedHeight: CGFloat = 64                    // just the Timeline / Properties tabs
+        let expandedHeight = min(max(CGFloat(panelFraction) * available, 150), available * 0.75)
+        let panelHeight = timelineCollapsed ? collapsedHeight : expandedHeight
+        let previewHeight = max(120, available - panelHeight - handleHeight - 8)
+        return VStack(spacing: 4) {
             previewBlock
-                .frame(height: max(160, size.height * 0.40))
-            tabbedPanel
+                .frame(height: previewHeight)
+            resizeHandle(available: available, currentHeight: panelHeight)
+            tabbedPanel(showsContent: !timelineCollapsed)
+                .frame(height: panelHeight)
         }
     }
 
     private func landscapePhoneLayout(size: CGSize) -> some View {
         HStack(spacing: 10) {
             previewBlock
-            tabbedPanel
+            tabbedPanel(showsContent: true)
                 .frame(width: max(320, size.width * 0.44))
         }
     }
 
     private func tabletLayout(size: CGSize) -> some View {
-        HStack(spacing: 12) {
-            VStack(spacing: 8) {
+        let available = max(300, size.height - 70)
+        let expandedHeight = min(max(CGFloat(panelFraction) * available, 160), available * 0.7)
+        let panelHeight: CGFloat = timelineCollapsed ? 0 : expandedHeight
+        return HStack(spacing: 12) {
+            VStack(spacing: 4) {
                 previewBlock
-                TimelinePanel(model: model)
-                    .panel()
-                    .frame(height: max(200, size.height * 0.34))
+                resizeHandle(available: available, currentHeight: panelHeight)
+                if !timelineCollapsed {
+                    TimelinePanel(model: model)
+                        .panel()
+                        .frame(height: panelHeight)
+                }
             }
             InspectorView(model: model)
                 .panel()
                 .frame(width: 340)
         }
+    }
+
+    /// The bar between the preview and the timeline. Drag it up or down to resize the timeline,
+    /// or tap the arrow to collapse and expand it.
+    private func resizeHandle(available: CGFloat, currentHeight: CGFloat) -> some View {
+        HStack {
+            Spacer()
+            Capsule()
+                .fill(Theme.textSecondary.opacity(0.5))
+                .frame(width: 40, height: 5)
+            Spacer()
+        }
+        .overlay(alignment: .trailing) {
+            Button { timelineCollapsed.toggle() } label: {
+                Image(systemName: timelineCollapsed ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 48, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(timelineCollapsed ? "Expand timeline" : "Collapse timeline")
+        }
+        .frame(height: 28)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 2)
+                .onChanged { value in
+                    if dragStartHeight == nil { dragStartHeight = currentHeight }
+                    let newHeight = (dragStartHeight ?? currentHeight) - value.translation.height
+                    if newHeight < 110 {
+                        timelineCollapsed = true
+                    } else {
+                        timelineCollapsed = false
+                        panelFraction = Double(min(max(newHeight / available, 0.2), 0.75))
+                    }
+                }
+                .onEnded { _ in dragStartHeight = nil }
+        )
+        .accessibilityLabel("Timeline size")
+        .accessibilityHint("Drag up or down to resize the timeline.")
     }
 
     private var previewBlock: some View {
@@ -95,7 +158,7 @@ struct EditorScreen: View {
         }
     }
 
-    private var tabbedPanel: some View {
+    private func tabbedPanel(showsContent: Bool) -> some View {
         VStack(spacing: 0) {
             Picker("Panel", selection: $tab) {
                 ForEach(LowerTab.allCases) { Text($0.rawValue).tag($0) }
@@ -103,11 +166,13 @@ struct EditorScreen: View {
             .pickerStyle(.segmented)
             .padding(10)
 
-            switch tab {
-            case .timeline:
-                TimelinePanel(model: model)
-            case .properties:
-                InspectorView(model: model)
+            if showsContent {
+                switch tab {
+                case .timeline:
+                    TimelinePanel(model: model)
+                case .properties:
+                    InspectorView(model: model)
+                }
             }
         }
         .panel()
@@ -163,6 +228,10 @@ struct EditorScreen: View {
                 .disabled(model.selectedLayerID == nil)
             Button(role: .destructive) { model.deleteSelected() } label: { Label("Delete layer", systemImage: "trash") }
                 .disabled(model.selectedLayerID == nil)
+            Divider()
+            Button { showingCompositionSettings = true } label: {
+                Label("Composition settings", systemImage: "slider.horizontal.3")
+            }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 17, weight: .bold))

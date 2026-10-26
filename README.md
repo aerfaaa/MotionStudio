@@ -6,29 +6,26 @@ Free and open source (MIT).
 
 This is **version 1**, a deliberately small foundation. It is real, but it is early.
 
-## What works in V1 (by design, not yet tested on a device: see below)
+## What exists (written, never compiled)
 
-- Projects saved as folders (`Name.motionproj`) and reopened later. Visible in the Files app.
-- A composition with a fixed pixel size and frame rate (24, 25, 30, 50, 60, 120 fps and the
-  fractional 23.976, 29.97 and 59.94), independent of the screen it is edited on.
+- Projects saved as folders (`Name.motionproj`) and reopened. Home screen with preview cards, rename, duplicate and delete.
+- New projects with size presets (16:9, 9:16, 1:1, 4:5, 3:4, HD, 4K) or a custom size, and frame rates 23.976 to 120 fps. Size, frame rate and length can be changed later without stretching artwork.
 - Rectangle, ellipse and solid layers. Tap to select, drag to move.
-- Timeline with a draggable ruler, one row per layer and keyframe markers.
-- Position, scale, rotation and opacity, each with keyframes (linear interpolation).
-- Play, pause, step frame by frame, loop. Playback speed follows the clock, not the screen refresh rate.
-- Undo and redo for every edit. Drags count as one step.
-- Layouts for iPhone portrait, iPhone landscape and iPad.
+- Position, independent X and Y scale, rotation and opacity, each with keyframes.
+- Timeline: draggable ruler, selected layer opens into property lanes; select, drag (snaps to frames), copy, paste and delete keyframes; easing presets with a curve preview.
+- A timeline you can resize and collapse (portrait and iPad).
+- Play, pause, step, loop; playback follows the clock, not the screen refresh rate.
+- Undo and redo for every edit; drags are one step.
+- System, Light and Dark appearance.
+- A registry of all 167 required effect names. **No effect is drawn yet.**
 
-## What is not in V1
+## What is not there yet
 
-Video, audio, images, text, effects, masks, mattes, blend mode controls, graph editor, expressions,
-Metal rendering and export. The code is organised so these can be added without rewriting the app
-(see `docs/ARCHITECTURE.md` and `docs/LONG-TERM-REVIEW.md`).
+Rendering of any effect, graph editor screen, video, audio, images, text, fonts, masks, mattes, export, time remapping, expressions, 3D. See `docs/FEATURE-STATUS.md` for the full matrix and `docs/EFFECTS-CATALOG.md`.
 
 ## Honest status
 
-The code was written without access to Xcode, a Mac or an iPhone, so **it has never been compiled or run**.
-The time maths and test numbers were checked with an independent script, but expect a few compile
-errors on the first build. That is normal; fix them from the GitHub Actions log.
+The code was written without access to Xcode, a Mac or an iPhone, so **nothing has been compiled or run**. Calculations such as the time system were cross-checked with an independent script, but expect compile errors on the first build. Fix them from the GitHub Actions logs.
 
 ## Folders
 
@@ -38,7 +35,8 @@ errors on the first build. That is normal; fix them from the GitHub Actions log.
 | `App/` | The SwiftUI iPhone/iPad app. |
 | `project.yml` | Recipe that generates the Xcode project on the build machine. |
 | `.github/workflows/` | Manual-only build and test jobs for GitHub Actions. |
-| `docs/` | Architecture, decisions, review, roadmap, build and install guide. |
+| `docs/` | Architecture, decisions, feature status, effects catalogue, graph editor, rendering, plugins, roadmap, build and install guide. |
+| `scripts/` | `check_repository.py`: checks that need no compiler. |
 
 ## Start here
 

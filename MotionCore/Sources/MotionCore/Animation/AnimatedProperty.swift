@@ -123,3 +123,93 @@ public struct AnimatedProperty<Value: Interpolatable & Codable & Equatable>: Cod
         return result
     }
 }
+
+// MARK: - Keyframe editing and curve lookup
+
+extension AnimatedProperty {
+
+    /// Moves a keyframe to a new time, keeping its value and easing. Throws if there is no keyframe
+    /// at `from`, or another keyframe already sits at `to`.
+    public mutating func moveKeyframe(from: Time, to: Time) throws {
+        guard let index = keyframes.firstIndex(where: { $0.time == from }) else {
+            throw EditError.keyframeNotFound
+        }
+        if from == to { return }
+        guard !keyframes.contains(where: { $0.time == to }) else {
+            throw EditError.keyframeOccupied
+        }
+        var moved = keyframes.remove(at: index)
+        moved.time = to
+        let insertAt = keyframes.firstIndex(where: { $0.time > to }) ?? keyframes.count
+        keyframes.insert(moved, at: insertAt)
+    }
+
+    /// Changes how the animation travels from the keyframe at `time` to the next one.
+    public mutating func setInterpolation(at time: Time, to interpolation: Interpolation) throws {
+        guard let index = keyframes.firstIndex(where: { $0.time == time }) else {
+            throw EditError.keyframeNotFound
+        }
+        keyframes[index].outgoing = interpolation
+    }
+
+    /// The pair of keyframes that surround `time`, and how far through them it is (0...1).
+    /// Returns nil before the first keyframe, at or after the last one, or with fewer than two keyframes.
+    public func segment(at time: Time) -> (from: Keyframe<Value>, to: Keyframe<Value>, progress: Double)? {
+        guard keyframes.count >= 2,
+              let first = keyframes.first, let last = keyframes.last,
+              time >= first.time, time < last.time else { return nil }
+        var low = 0
+        var high = keyframes.count - 1
+        while high - low > 1 {
+            let middle = (low + high) / 2
+            if keyframes[middle].time <= time { low = middle } else { high = middle }
+        }
+        let from = keyframes[low]
+        let to = keyframes[high]
+        let span = Double(to.time.ticks - from.time.ticks)
+        return (from, to, Double(time.ticks - from.time.ticks) / span)
+    }
+}
+
+// MARK: - Speed (the maths behind a Speed Graph)
+
+extension AnimatedProperty where Value == Double {
+    /// How fast the value is changing at `time`, in units per second. Zero outside the keyframes
+    /// and on "hold" segments.
+    public func speed(at time: Time) -> Double {
+        guard let seg = self.segment(at: time) else { return 0 }
+        let seconds = (seg.to.time - seg.from.time).seconds
+        guard seconds > 0 else { return 0 }
+        let change = seg.to.value - seg.from.value
+        switch seg.from.outgoing {
+        case .hold: return 0
+        case .linear: return change / seconds
+        case .bezier(let ease): return change / seconds * ease.derivative(at: seg.progress)
+        }
+    }
+
+    /// The value at evenly spaced times, for drawing a Value Graph.
+    public func sampledValues(from start: Time, to end: Time, count: Int) -> [(time: Time, value: Double)] {
+        guard count >= 2, end > start else { return [] }
+        return (0..<count).map { (i: Int) -> (time: Time, value: Double) in
+            let ticks = start.ticks + (end.ticks - start.ticks) * Int64(i) / Int64(count - 1)
+            let sampleTime = Time(ticks: ticks)
+            return (sampleTime, self.value(at: sampleTime))
+        }
+    }
+}
+
+extension AnimatedProperty where Value == Vec2 {
+    /// Speed of a two-number property: the length of its velocity, in units per second.
+    public func speed(at time: Time) -> Double {
+        guard let seg = self.segment(at: time) else { return 0 }
+        let seconds = (seg.to.time - seg.from.time).seconds
+        guard seconds > 0 else { return 0 }
+        let distance = (seg.to.value - seg.from.value).length
+        switch seg.from.outgoing {
+        case .hold: return 0
+        case .linear: return distance / seconds
+        case .bezier(let ease): return distance / seconds * abs(ease.derivative(at: seg.progress))
+        }
+    }
+}

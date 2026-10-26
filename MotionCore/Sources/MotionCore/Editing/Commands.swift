@@ -256,3 +256,126 @@ public struct RemoveKeyframe: Command {
         }
     }
 }
+
+/// Moves a keyframe to another time. While a finger drags a keyframe, the moves merge into one undo step.
+public struct MoveKeyframe: Command {
+    public let compositionID: UUID
+    public let layerID: UUID
+    public let property: PropertyKey
+    public let from: Time
+    public let to: Time
+    public let coalescingKey: String?
+
+    public init(compositionID: UUID, layerID: UUID, property: PropertyKey,
+                from: Time, to: Time, coalescingKey: String? = nil) {
+        self.compositionID = compositionID
+        self.layerID = layerID
+        self.property = property
+        self.from = from
+        self.to = to
+        self.coalescingKey = coalescingKey
+    }
+
+    public var name: String { "Move Keyframe" }
+
+    public func apply(to project: inout Project) throws {
+        try project.updateLayer(compositionID, layerID) { layer in
+            try layer.moveKeyframe(property, from: from, to: to)
+        }
+    }
+}
+
+public struct SetKeyframeInterpolation: Command {
+    public let compositionID: UUID
+    public let layerID: UUID
+    public let property: PropertyKey
+    public let time: Time
+    public let interpolation: Interpolation
+
+    public init(compositionID: UUID, layerID: UUID, property: PropertyKey,
+                time: Time, interpolation: Interpolation) {
+        self.compositionID = compositionID
+        self.layerID = layerID
+        self.property = property
+        self.time = time
+        self.interpolation = interpolation
+    }
+
+    public var name: String { "Change Easing" }
+
+    public func apply(to project: inout Project) throws {
+        try project.updateLayer(compositionID, layerID) { layer in
+            try layer.setKeyframeInterpolation(property, at: time, to: interpolation)
+        }
+    }
+}
+
+/// Adds a keyframe with a given value (used for paste).
+public struct InsertKeyframe: Command {
+    public let compositionID: UUID
+    public let layerID: UUID
+    public let property: PropertyKey
+    public let snapshot: KeyframeSnapshot
+    public let commandName: String
+
+    public init(compositionID: UUID, layerID: UUID, property: PropertyKey,
+                snapshot: KeyframeSnapshot, commandName: String = "Paste Keyframe") {
+        self.compositionID = compositionID
+        self.layerID = layerID
+        self.property = property
+        self.snapshot = snapshot
+        self.commandName = commandName
+    }
+
+    public var name: String { commandName }
+
+    public func apply(to project: inout Project) throws {
+        try project.updateLayer(compositionID, layerID) { layer in
+            try layer.insertKeyframe(property, snapshot)
+        }
+    }
+}
+
+/// Changes a composition's size, frame rate or length.
+///
+/// - Layers keep their pixel positions and sizes, so artwork is never stretched when the canvas changes.
+/// - A new length is always a whole number of frames. Layers that ended exactly at the old end follow the new end.
+public struct SetCompositionSettings: Command {
+    public static let minimumSize = 16
+    public static let maximumSize = 16384
+
+    public let compositionID: UUID
+    public let width: Int
+    public let height: Int
+    public let frameRate: FrameRate
+    public let durationSeconds: Double
+
+    public init(compositionID: UUID, width: Int, height: Int, frameRate: FrameRate, durationSeconds: Double) {
+        self.compositionID = compositionID
+        self.width = width
+        self.height = height
+        self.frameRate = frameRate
+        self.durationSeconds = durationSeconds
+    }
+
+    public var name: String { "Composition Settings" }
+
+    public func apply(to project: inout Project) throws {
+        guard width >= SetCompositionSettings.minimumSize, width <= SetCompositionSettings.maximumSize,
+              height >= SetCompositionSettings.minimumSize, height <= SetCompositionSettings.maximumSize,
+              durationSeconds > 0, Time(seconds: durationSeconds) <= Time.maximumDuration else {
+            throw EditError.invalidValue
+        }
+        try project.updateComposition(compositionID) { composition in
+            let oldDuration = composition.duration
+            let newDuration = Composition.wholeFrameDuration(seconds: durationSeconds, frameRate: frameRate)
+            composition.width = width
+            composition.height = height
+            composition.frameRate = frameRate
+            composition.duration = newDuration
+            for index in composition.layers.indices where composition.layers[index].outPoint == oldDuration {
+                composition.layers[index].outPoint = newDuration
+            }
+        }
+    }
+}

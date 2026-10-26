@@ -43,6 +43,13 @@ public struct Composition: Codable, Equatable, Identifiable {
         Vec2(x: Double(width) / 2, y: Double(height) / 2)
     }
 
+    /// A length that is a whole number of frames, rounded to the nearest frame
+    /// (5 seconds at 29.97 fps is 150 frames, which is 5.005 seconds).
+    public static func wholeFrameDuration(seconds: Double, frameRate: FrameRate) -> Time {
+        let frames = max(1, Int64((seconds * frameRate.framesPerSecond).rounded()))
+        return frameRate.time(ofFrame: frames)
+    }
+
     public func layer(withID id: UUID) -> Layer? {
         layers.first(where: { $0.id == id })
     }
