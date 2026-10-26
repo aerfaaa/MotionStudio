@@ -81,6 +81,10 @@ Keyframes can be moved (`MoveKeyframe`), given new easing (`SetKeyframeInterpola
 
 `Theme` colours are dynamic (light and dark). The choice System, Light or Dark is saved with `@AppStorage("appearance")` and applied with `preferredColorScheme`.
 
+## Media and the image-effects pipeline
+
+Imported pictures live in the project folder (`ProjectMedia`). `Asset` records the relative path and pixel size. An image layer points at an asset by id. `PixelImage` (premultiplied float RGBA with an origin offset) and `ImageEffects` live in MotionCore, so effects are testable with exact pixel values and independent of the screen. `EffectPipeline` runs the enabled effects in list order and returns the picture plus any problems. In the app `LayerImageProvider` decodes a reduced copy with ImageIO, runs the pipeline in a background task, caches by (asset, size, resolved effects) and tells the preview to redraw. Details in `MEDIA-AND-EFFECTS.md`.
+
 ## Extension points
 
 | To add... | Where | What else changes |

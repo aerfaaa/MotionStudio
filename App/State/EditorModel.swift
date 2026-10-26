@@ -45,6 +45,12 @@ final class EditorModel {
     var lastError: String?
     /// The keyframe being edited, if any.
     private(set) var selectedKeyframe: KeyframeRef?
+    /// Prepares the pictures (and effect results) the preview draws for image layers.
+    let images = LayerImageProvider()
+    /// True while a picture is being checked and copied into the project.
+    private(set) var isImporting = false
+    /// The effect being edited in the Effects panel.
+    var selectedEffectID: UUID?
     /// The last copied keyframe, ready to paste.
     private(set) var copiedKeyframe: (property: PropertyKey, snapshot: KeyframeSnapshot)?
 
@@ -60,6 +66,7 @@ final class EditorModel {
         self.project = project
         self.document = Document(project: project)
         self.folderURL = folderURL
+        images.configure(assets: project.assets, folderURL: folderURL)
     }
 
     // MARK: Convenient values
@@ -81,6 +88,7 @@ final class EditorModel {
     // MARK: Selection and layers
 
     func select(_ id: UUID?) {
+        if selectedLayerID != id { selectedEffectID = nil }
         selectedLayerID = id
         if selectedKeyframe?.layerID != id { selectedKeyframe = nil }
     }
@@ -175,6 +183,93 @@ final class EditorModel {
         } else {
             run(AddKeyframe(compositionID: compositionID, layerID: layerID, property: key, time: time))
         }
+    }
+
+    // MARK: Importing pictures
+
+    /// Imports a picture chosen in the Files app.
+    func importImage(fromFile url: URL) {
+        beginImport { folder in try ImageImporter.importFile(from: url, projectFolder: folder) }
+    }
+
+    /// Imports picture data, for example from the Photos library.
+    func importImage(data: Data, fileExtension: String, baseName: String) {
+        beginImport { folder in
+            try ImageImporter.importData(data, fileExtension: fileExtension, baseName: baseName, projectFolder: folder)
+        }
+    }
+
+    private func beginImport(_ work: @escaping @Sendable (URL) throws -> Asset) {
+        guard !isImporting else { return }
+        isImporting = true
+        let folder = folderURL
+        Task {
+            do {
+                // Checking and copying a large picture happens off the main thread.
+                let asset = try await Task.detached(priority: .userInitiated) { try work(folder) }.value
+                addImageLayer(for: asset)
+            } catch {
+                lastError = error.localizedDescription
+            }
+            isImporting = false
+        }
+    }
+
+    private func addImageLayer(for asset: Asset) {
+        guard let layer = ImageLayerFactory.makeLayer(for: asset, in: composition) else {
+            ProjectMedia.removeFile(relativePath: asset.relativePath, inProjectFolder: folderURL)
+            lastError = "The size of that picture could not be read."
+            return
+        }
+        run(AddMediaLayer(compositionID: compositionID, asset: asset, layer: layer, index: 0))
+        if composition.layer(withID: layer.id) != nil {
+            selectedLayerID = layer.id
+        } else {
+            ProjectMedia.removeFile(relativePath: asset.relativePath, inProjectFolder: folderURL)
+        }
+    }
+
+    // MARK: Effects
+
+    func addEffect(_ effectID: String) {
+        guard let layerID = selectedLayerID else { return }
+        let instanceID = UUID()
+        run(AddEffect(compositionID: compositionID, layerID: layerID, effectID: effectID, instanceID: instanceID))
+        if selectedLayer?.effects.contains(where: { $0.id == instanceID }) == true {
+            selectedEffectID = instanceID
+        }
+    }
+
+    func removeEffect(_ instanceID: UUID) {
+        guard let layerID = selectedLayerID else { return }
+        run(RemoveEffect(compositionID: compositionID, layerID: layerID, instanceID: instanceID))
+        if selectedEffectID == instanceID { selectedEffectID = nil }
+    }
+
+    /// Moves an effect earlier (negative) or later (positive) in the stack. Order changes the result.
+    func moveEffect(_ instanceID: UUID, by offset: Int) {
+        guard let layer = selectedLayer, let index = layer.effects.firstIndex(where: { $0.id == instanceID }) else { return }
+        let target = index + offset
+        guard target >= 0, target < layer.effects.count else { return }
+        run(MoveEffect(compositionID: compositionID, layerID: layer.id, instanceID: instanceID, newIndex: target))
+    }
+
+    func setEffectEnabled(_ instanceID: UUID, _ isEnabled: Bool) {
+        guard let layerID = selectedLayerID else { return }
+        run(SetEffectEnabled(compositionID: compositionID, layerID: layerID, instanceID: instanceID, isEnabled: isEnabled))
+    }
+
+    /// Changes settings of an effect. While a slider is dragged the changes merge into one undo step.
+    func setEffectValues(_ instanceID: UUID, _ values: [String: [Double]], coalescing: Bool) {
+        guard let layerID = selectedLayerID else { return }
+        let key = coalescing ? "effect-\(instanceID.uuidString)-" + values.keys.sorted().joined(separator: ",") : nil
+        run(SetEffectParameters(compositionID: compositionID, layerID: layerID, instanceID: instanceID,
+                                values: values, time: currentTime, coalescingKey: key))
+    }
+
+    func resetEffect(_ instanceID: UUID) {
+        guard let layerID = selectedLayerID else { return }
+        run(ResetEffect(compositionID: compositionID, layerID: layerID, instanceID: instanceID))
     }
 
     // MARK: Keyframes
@@ -366,6 +461,11 @@ final class EditorModel {
            composition.layer(withID: ref.layerID)?.hasKeyframe(ref.property, at: ref.time) != true {
             selectedKeyframe = nil
         }
+        if let effectID = selectedEffectID,
+           selectedLayer?.effects.contains(where: { $0.id == effectID }) != true {
+            selectedEffectID = nil
+        }
+        images.configure(assets: project.assets, folderURL: folderURL)
         let lastFrame = max(0, frameCount - 1)
         if currentFrame > lastFrame { currentFrame = lastFrame }
         scheduleSave()

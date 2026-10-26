@@ -12,7 +12,8 @@ enum CanvasRenderer {
     static func draw(frame: ResolvedFrame,
                      selectedLayerID: UUID?,
                      viewport: Viewport,
-                     context: GraphicsContext) {
+                     context: GraphicsContext,
+                     images: [UUID: ProvidedImage] = [:]) {
         let scale = viewport.scale
         let origin = viewport.origin
         let compRect = CGRect(x: origin.x, y: origin.y,
@@ -32,6 +33,10 @@ enum CanvasRenderer {
             layerContext.concatenate(compToView.concatenating(layer.transform).cgAffine)
 
             let rect = CGRect(x: 0, y: 0, width: layer.size.x, height: layer.size.y)
+            if case .image = layer.kind {
+                drawImageLayer(layer, rect: rect, provided: images[layer.id], in: &layerContext)
+                continue
+            }
             let path: Path
             if case .shape(.ellipse) = layer.kind {
                 path = Path(ellipseIn: rect)
@@ -43,6 +48,27 @@ enum CanvasRenderer {
 
         context.stroke(Path(compRect), with: .color(Theme.hairline), lineWidth: 1)
         drawSelection(frame: frame, selectedLayerID: selectedLayerID, viewport: viewport, context: context)
+    }
+
+    /// An imported picture, after its effects. While the picture is still loading, or if its file is missing,
+    /// a plain placeholder is drawn instead (never a fake effect).
+    private static func drawImageLayer(_ layer: ResolvedLayer, rect: CGRect, provided: ProvidedImage?,
+                                       in context: inout GraphicsContext) {
+        switch provided ?? .missing {
+        case .ready(let image, let drawRect):
+            let resolved = context.resolve(Image(decorative: image, scale: 1))
+            context.draw(resolved, in: drawRect)
+        case .loading:
+            context.fill(Path(rect), with: .color(Color.gray.opacity(0.25)))
+        case .missing:
+            context.fill(Path(rect), with: .color(Color.gray.opacity(0.35)))
+            var cross = Path()
+            cross.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            cross.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            cross.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            cross.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            context.stroke(cross, with: .color(Color.white.opacity(0.5)), lineWidth: max(2, rect.width / 200))
+        }
     }
 
     /// An outline around the selected layer, following its rotation and scale.

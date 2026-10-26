@@ -224,15 +224,19 @@ private struct ProjectThumbnail: View {
     let entry: ProjectEntry
     @State private var frame: ResolvedFrame?
     @State private var failed = false
+    @State private var images = LayerImageProvider()
 
     var body: some View {
         ZStack {
             Theme.surfaceRaised
             if let frame {
+                let _ = images.version
+                let provided = images.provideAll(for: frame)
                 Canvas { context, size in
                     let viewport = Viewport(compWidth: Double(frame.width), compHeight: Double(frame.height),
                                             viewWidth: Double(size.width), viewHeight: Double(size.height))
-                    CanvasRenderer.draw(frame: frame, selectedLayerID: nil, viewport: viewport, context: context)
+                    CanvasRenderer.draw(frame: frame, selectedLayerID: nil, viewport: viewport,
+                                        context: context, images: provided)
                 }
             } else if failed {
                 Image(systemName: "exclamationmark.triangle")
@@ -242,6 +246,7 @@ private struct ProjectThumbnail: View {
         .task(id: entry) {
             do {
                 let project = try ProjectFile.load(fromFolder: entry.url)
+                images.configure(assets: project.assets, folderURL: entry.url)
                 let composition = project.rootComposition
                 // A frame from the middle shows more than the very first frame usually does.
                 frame = Evaluator.resolve(composition, frame: max(0, composition.frameCount / 2))

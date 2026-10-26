@@ -22,13 +22,17 @@ struct PreviewView: View {
             let composition = model.composition
             let frame = model.resolvedFrame
             let selected = model.selectedLayerID
+            // Pictures (and their effects) are prepared in the background. Reading `version` makes the
+            // preview redraw when one finishes.
+            let _ = model.images.version
+            let images = model.images.provideAll(for: frame)
             let viewport = Viewport(compWidth: Double(composition.width),
                                     compHeight: Double(composition.height),
                                     viewWidth: Double(geometry.size.width),
                                     viewHeight: Double(geometry.size.height))
             Canvas { context, _ in
                 CanvasRenderer.draw(frame: frame, selectedLayerID: selected,
-                                    viewport: viewport, context: context)
+                                    viewport: viewport, context: context, images: images)
             }
             .contentShape(Rectangle())
             .gesture(dragGesture(viewport: viewport, frame: frame))

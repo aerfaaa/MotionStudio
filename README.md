@@ -17,11 +17,13 @@ This is **version 1**, a deliberately small foundation. It is real, but it is ea
 - Play, pause, step, loop; playback follows the clock, not the screen refresh rate.
 - Undo and redo for every edit; drags are one step.
 - System, Light and Dark appearance.
-- A registry of all 167 required effect names. **No effect is drawn yet.**
+- **Import images** from the Photos library or the Files app. Each is copied into the project and becomes a real image layer you can move, scale, rotate and fade.
+- **Effects panel** for image layers: 15 working-in-code effects (Brightness / Contrast, Hue Shift, Saturation, Invert, Gaussian Blur, Sharpen, Vignette, Drop Shadow, Glow, Gradient Map, RGB Split, Pixelate, Posterize, Directional Blur, Wave Warp), stackable, reorderable, switchable on and off, saved with the project and undoable.
+- A registry of all 167 required effect names plus Drop Shadow. The other 153 are names only.
 
 ## What is not there yet
 
-Rendering of any effect, graph editor screen, video, audio, images, text, fonts, masks, mattes, export, time remapping, expressions, 3D. See `docs/FEATURE-STATUS.md` for the full matrix and `docs/EFFECTS-CATALOG.md`.
+Effects on shapes or text, the other 153 catalogue effects, graph editor screen, video, audio, text, fonts, masks, mattes, export, time remapping, expressions, 3D. See `docs/FEATURE-STATUS.md` for the full matrix, `docs/MEDIA-AND-EFFECTS.md` for how import and effects work, and `docs/EFFECTS-CATALOG.md`.
 
 ## Honest status
 

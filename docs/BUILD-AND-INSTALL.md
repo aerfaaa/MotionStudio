@@ -12,6 +12,25 @@ messages back to Claude to get them fixed.
 - Git for Windows (download from git-scm.com).
 - Your iPhone, a USB cable and a free Apple ID (only for installing, step 5).
 
+## Updating a repository you already have
+
+If you already uploaded an earlier version (for example `aerfaaa/MotionStudio`), do not make a new repository. Put the new files on top of your local copy, then push. In **Command Prompt**, replacing the folder names with yours:
+
+```
+cd %USERPROFILE%\Downloads
+rmdir /S /Q MotionStudioUpdate
+mkdir MotionStudioUpdate
+tar -xf MotionStudio.zip -C MotionStudioUpdate
+xcopy /E /H /Y MotionStudioUpdate\MotionStudio\* C:\path\to\your\MotionStudio\
+cd C:\path\to\your\MotionStudio
+git status
+git add .
+git commit -m "Add image import and the effects engine"
+git push
+```
+
+`git status` lists what changed. Then run **Core tests** and **iOS build** on the Actions tab as described below. Nothing is deleted by this copy; files that no longer exist in the new version stay behind (this release removes none).
+
 ## 1. Unzip the project
 
 Open **Command Prompt** (press the Windows key, type `cmd`, press Enter). Type each line and press Enter:

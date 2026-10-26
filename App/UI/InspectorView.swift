@@ -15,7 +15,11 @@ struct InspectorView: View {
                     RenameField(layerName: layer.name) { model.rename(layer.id, to: $0) }
                         .id(layer.id)
 
-                    swatches(for: layer)
+                    if case .image(let assetID) = layer.kind {
+                        imageInfo(layer: layer, assetID: assetID)
+                    } else {
+                        swatches(for: layer)
+                    }
 
                     VStack(spacing: 6) {
                         positionRow(layer)
@@ -217,6 +221,28 @@ struct InspectorView: View {
                 if model.copiedKeyframe != nil {
                     actionButton("Paste at playhead", systemName: "doc.on.clipboard") { model.pasteKeyframe() }
                 }
+            }
+        }
+    }
+
+    /// Shows which picture the layer uses, and says so clearly if its file is missing.
+    private func imageInfo(layer: Layer, assetID: UUID) -> some View {
+        let asset = model.project.assets.first(where: { $0.id == assetID })
+        let isMissing = asset.map { !ProjectMedia.fileExists(for: $0, inProjectFolder: model.folderURL) } ?? true
+        return VStack(alignment: .leading, spacing: 4) {
+            Label(asset?.displayName ?? "Unknown picture", systemImage: "photo")
+                .font(.footnote)
+                .foregroundStyle(Theme.textSecondary)
+            if let size = asset?.pixelSize {
+                Text("\(Int(size.x)) by \(Int(size.y)) pixels")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            if isMissing {
+                Label("The picture file is missing from the project folder. The layer shows a grey placeholder.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.danger)
             }
         }
     }

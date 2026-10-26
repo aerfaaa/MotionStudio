@@ -25,3 +25,45 @@ public struct EffectInstance: Codable, Equatable, Identifiable {
         self.parameters = parameters
     }
 }
+
+extension EffectInstance {
+    /// Sets one setting from numbers (one for a scalar or choice, two for a vector). The value is moved into
+    /// the allowed range. If the setting already has keyframes the edit becomes a keyframe at `time`;
+    /// otherwise it changes the fixed value.
+    public mutating func setParameter(_ rule: EffectParameterDefinition, to numbers: [Double], at time: Time) throws {
+        switch rule.kind {
+        case .scalar, .choice:
+            guard numbers.count == 1, numbers[0].isFinite else { throw EditError.invalidValue }
+            let value = EffectRegistry.clamp(numbers[0], for: rule.kind)
+            var track: AnimatedProperty<Double>
+            if case .scalar(let existing)? = parameters[rule.id] {
+                track = existing
+            } else {
+                track = AnimatedProperty(value)
+            }
+            if track.isAnimated {
+                let easing = track.keyframe(at: time)?.outgoing ?? .linear
+                track.setKeyframe(at: time, value: value, interpolation: easing)
+            } else {
+                track.staticValue = value
+            }
+            parameters[rule.id] = .scalar(track)
+        case .vector:
+            guard numbers.count == 2, numbers[0].isFinite, numbers[1].isFinite else { throw EditError.invalidValue }
+            let value = Vec2(x: min(max(numbers[0], -10_000), 10_000), y: min(max(numbers[1], -10_000), 10_000))
+            var track: AnimatedProperty<Vec2>
+            if case .vector(let existing)? = parameters[rule.id] {
+                track = existing
+            } else {
+                track = AnimatedProperty(value)
+            }
+            if track.isAnimated {
+                let easing = track.keyframe(at: time)?.outgoing ?? .linear
+                track.setKeyframe(at: time, value: value, interpolation: easing)
+            } else {
+                track.staticValue = value
+            }
+            parameters[rule.id] = .vector(track)
+        }
+    }
+}

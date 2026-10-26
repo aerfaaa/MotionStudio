@@ -10,11 +10,21 @@ Project -> Evaluator.resolve(composition, frame:) -> ResolvedFrame -> CanvasRend
 
 ## What is supported
 
-Solid, rectangle and ellipse layers; opacity; the four blend modes (normal, add, multiply, screen); 2D transforms with parents.
+Solid, rectangle, ellipse and **image** layers; opacity; the four blend modes (normal, add, multiply, screen); 2D transforms with parents; and, on image layers, 15 effects.
+
+### Image layers and effects
+
+```
+ResolvedLayer (kind .image, effects with this frame's values)
+  -> LayerImageProvider: reduced copy from the project's media folder (ImageIO)
+  -> EffectPipeline (background task, MotionCore ImageEffects on a PixelImage)
+  -> CGImage -> drawn by CanvasRenderer at the layer's transform
+```
+The pipeline code is in MotionCore and does not use the screen, so a video exporter can run the same processing on each frame. Results are cached by (picture, size, effect settings). While new settings are processed the previous result stays visible.
 
 ## What is not
 
-Effects (settings are evaluated but nothing is drawn), images, video, audio, text, masks, mattes, Metal, export of any kind. **There is no export.** No MP4, no still frame, no share sheet.
+Video, audio, text, masks, mattes, Metal, effects on non-image layers, export of any kind. **There is no export.** No MP4, no still frame, no share sheet.
 
 ## Plan
 

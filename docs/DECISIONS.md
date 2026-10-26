@@ -26,3 +26,11 @@ Short records of choices that are hard to change later.
 22. **Liquid Glass is deferred.** It cannot be verified without a compiler and could break the only build we have.
 23. **Theme colours are dynamic** so light and dark share one set of names.
 24. **The timeline size is stored as a fraction of the screen height** so it adapts across devices.
+25. **Effects are plain Swift on a float pixel array (`PixelImage`)**, not Core Image. Reason: exact, deterministic tests with known pixel values, identical behaviour everywhere, and no unverifiable filter details without a Mac. Cost: CPU speed, mitigated by a reduced-size preview copy and background processing. A GPU path can replace it behind `EffectPipeline` later.
+26. **Effect settings are written in layer pixels** and scaled by the preview's bitmap-pixels-per-layer-pixel, so previews and full-size results agree and results do not depend on the composition size.
+27. **Effects run on image layers only for now.** Shapes would need rasterising first. The panel and the `AddEffect` command both refuse other layer types.
+28. **Media is copied into `media/` inside the project** and referenced by a relative `media/<file>` path. Anything else is refused, so a damaged project cannot point outside its folder.
+29. **No project format version bump.** `Asset.pixelSize` is optional and old files decode unchanged (tested).
+30. **Unknown effects are kept in the file and skipped when drawing**, never deleted, so a project from a newer version is not damaged by opening it.
+31. **The preview keeps showing the previous effect result until the new one is ready** (no flicker, no fake overlay).
+32. **Statuses are computed:** an effect is Partial exactly when processing code is connected. Nothing is Working until its tests have run and passed.

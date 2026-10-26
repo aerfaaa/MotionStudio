@@ -6,11 +6,37 @@ import Foundation
 /// the catalogue is complete by name but no effect is rendered yet (all are `missing`).
 public enum EffectRegistry {
 
-    public static let all: [EffectDefinition] = EffectCatalogData.entries.map { entry in
+    /// Every effect: the required catalogue plus the extra entries. An effect is `partial` once real
+    /// processing code is connected (`ImageEffects`), otherwise `missing`. None is `working` until its
+    /// tests have actually been run and passed.
+    public static let all: [EffectDefinition] = (EffectCatalogData.entries + EffectCatalogData.additionalEntries).map { entry in
         let id = slug(entry.name)
         return EffectDefinition(id: id, name: entry.name, category: entry.category,
-                                status: .missing,
+                                status: ImageEffects.isAvailable(id) ? .partial : .missing,
                                 parameters: EffectParameterTable.parameters[id] ?? [])
+    }
+
+    /// Effects that can really be applied now (their processing code is connected), in catalogue order
+    /// within each category.
+    public static var available: [EffectDefinition] {
+        all.filter { ImageEffects.isAvailable($0.id) }
+    }
+
+    public static func isAvailable(id: String) -> Bool {
+        ImageEffects.isAvailable(id)
+    }
+
+    /// nil if effects can be applied to this kind of layer, otherwise a message for the user.
+    /// Effects currently work on image layers, because they are processed from the layer's pixels.
+    public static func applicabilityMessage(for kind: LayerKind) -> String? {
+        switch kind {
+        case .image:
+            return nil
+        case .solid, .shape:
+            return "Effects work on image layers in this version. Import an image to use them."
+        case .null:
+            return "A null layer has no picture to apply effects to."
+        }
     }
 
     private static let byID: [String: EffectDefinition] =

@@ -50,7 +50,7 @@ required = [
     ".github/workflows/core-tests.yml", ".github/workflows/ios-build.yml",
     "docs/BUILD-AND-INSTALL.md", "docs/ARCHITECTURE.md", "docs/DECISIONS.md", "docs/ROADMAP.md",
     "docs/FEATURE-STATUS.md", "docs/EFFECTS-CATALOG.md", "docs/GRAPH-EDITOR.md",
-    "docs/RENDERING-AND-EXPORT.md", "docs/PLUGIN-COMPATIBILITY.md",
+    "docs/RENDERING-AND-EXPORT.md", "docs/PLUGIN-COMPATIBILITY.md", "docs/MEDIA-AND-EFFECTS.md",
 ]
 for path in required:
     if not os.path.exists(os.path.join(ROOT, path)):
@@ -68,9 +68,12 @@ required_names = os.path.join(ROOT, "MotionCore/Tests/MotionCoreTests/RequiredEf
 if os.path.exists(catalog) and os.path.exists(required_names):
     in_catalog = re.findall(r'^\s*\("(.+)", \.\w+\),\s*$', open(catalog, encoding="utf-8").read(), re.M)
     in_required = re.findall(r'^\s*"(.+)",\s*$', open(required_names, encoding="utf-8").read(), re.M)
-    if sorted(in_catalog) != sorted(in_required):
-        fail("effect catalogue and required-name list differ: "
-             f"{sorted(set(in_required) ^ set(in_catalog))}")
+    missing_names = sorted(set(in_required) - set(in_catalog))
+    if missing_names:
+        fail(f"effects required but not in the catalogue: {missing_names}")
+    extras = sorted(set(in_catalog) - set(in_required))
+    if extras != ["Drop Shadow"]:
+        fail(f"unexpected extra effects in the catalogue: {extras}")
     if len(set(in_catalog)) != len(in_catalog):
         fail("duplicate effect names in the catalogue")
     print(f"effect catalogue: {len(in_catalog)} names")

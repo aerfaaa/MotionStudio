@@ -172,4 +172,9 @@ enum EffectCatalogData {
         ("Zoom Blur", .blurSharpen),
         ("Zoom Streaks", .light),
     ]
+
+    /// Effects that are not in the original required list but are part of the product.
+    static let additionalEntries: [(name: String, category: EffectCategory)] = [
+        ("Drop Shadow", .light),
+    ]
 }

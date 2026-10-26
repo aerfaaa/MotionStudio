@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
 import MotionCore
 
 private enum LowerTab: String, CaseIterable, Identifiable {
@@ -21,6 +23,11 @@ struct EditorScreen: View {
     @AppStorage("timelineCollapsed") private var timelineCollapsed = false
     @State private var dragStartHeight: CGFloat?
     @State private var showingCompositionSettings = false
+    @State private var sideTab: SideTab = .properties
+    @State private var showingImportChoice = false
+    @State private var showingPhotoPicker = false
+    @State private var showingFileImporter = false
+    @State private var photoItem: PhotosPickerItem?
     let onClose: () -> Void
 
     init(model: EditorModel, onClose: @escaping () -> Void) {
@@ -44,6 +51,33 @@ struct EditorScreen: View {
         }
         .sheet(isPresented: $showingCompositionSettings) {
             CompositionSettingsSheet(model: model)
+        }
+        .confirmationDialog("Import image", isPresented: $showingImportChoice, titleVisibility: .visible) {
+            Button("Photo Library") { showingPhotoPicker = true }
+            Button("Files") { showingFileImporter = true }
+            Button("Cancel", role: .cancel) {}
+        }
+        .photosPicker(isPresented: $showingPhotoPicker, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            photoItem = nil
+            Task { await importPhoto(item) }
+        }
+        .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.image],
+                      allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first { model.importImage(fromFile: url) }
+            case .failure(let error):
+                model.lastError = "The file could not be opened. \(error.localizedDescription)"
+            }
+        }
+        .overlay {
+            if model.isImporting {
+                ProgressView("Importing…")
+                    .padding(24)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
         }
         .alert("Something went wrong",
                isPresented: .constant(model.lastError != nil),
@@ -102,9 +136,19 @@ struct EditorScreen: View {
                         .frame(height: panelHeight)
                 }
             }
-            InspectorView(model: model)
-                .panel()
-                .frame(width: 340)
+            VStack(spacing: 0) {
+                Picker("Side panel", selection: $sideTab) {
+                    ForEach(SideTab.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .padding(10)
+                switch sideTab {
+                case .properties: InspectorView(model: model)
+                case .effects: EffectsPanel(model: model)
+                }
+            }
+            .panel()
+            .frame(width: 340)
         }
     }
 
@@ -172,6 +216,8 @@ struct EditorScreen: View {
                     TimelinePanel(model: model)
                 case .properties:
                     InspectorView(model: model)
+                case .effects:
+                    EffectsPanel(model: model)
                 }
             }
         }
@@ -212,6 +258,8 @@ struct EditorScreen: View {
             }
             .opacity(model.canRedo ? 1 : 0.35)
             .disabled(!model.canRedo)
+
+            IconButton(systemName: "photo.badge.plus", label: "Import image") { showingImportChoice = true }
 
             addMenu
         }
@@ -256,6 +304,20 @@ struct EditorScreen: View {
         case .saved: return "Saved"
         case .unsaved: return "Saving"
         case .failed: return "Not saved"
+        }
+    }
+
+    /// Loads a photo chosen in the Photos library and imports it. Cancelling the picker does nothing.
+    private func importPhoto(_ item: PhotosPickerItem) async {
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                model.lastError = "The photo could not be loaded."
+                return
+            }
+            let fileExtension = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
+            model.importImage(data: data, fileExtension: fileExtension, baseName: "Photo")
+        } catch {
+            model.lastError = "The photo could not be loaded. \(error.localizedDescription)"
         }
     }
 

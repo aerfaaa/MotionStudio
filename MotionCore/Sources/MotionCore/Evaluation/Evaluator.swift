@@ -1,7 +1,7 @@
 import Foundation
 
 /// An effect with every setting worked out for one moment in time.
-public struct ResolvedEffect: Equatable {
+public struct ResolvedEffect: Hashable {
     public var effectID: String
     /// Setting name to its numbers: one number for scalars, two (x, y) for vectors.
     public var values: [String: [Double]]

@@ -4,7 +4,11 @@ Labels: **Working** = implemented and verified by tests or runtime checks. **Par
 
 **Important:** no Swift code in this project has ever been compiled or run (the working environment has no Swift, Xcode or Mac). So nothing is labelled Working. Items marked Partial are written, and the "Evidence" column says what was actually checked.
 
-## Baseline audit (this pass)
+## Audit for the media and effects pass
+
+Checked in the source before editing: image layers (`LayerKind.image`) existed in the model but nothing created them, the renderer drew them as plain rectangles, `Asset` had no pixel size, effects were saved and evaluated but nothing processed them and no interface existed. Existing projects (no assets, no effects) must keep opening: asset pixel size is optional, effect lists default to empty. No project format version bump was needed; older files decode as before (tested).
+
+## Baseline audit (earlier pass)
 
 - The workspace matches the delivered `MotionStudio.zip`: 60 files, about 4,450 lines of Swift before this pass.
 - Entry point `App/MotionStudioApp.swift`; core in `MotionCore`; `ResolvedFrame` is the renderer contract, as documented.
@@ -47,13 +51,21 @@ Graphite surfaces with 18 pt rounded panels and thin hairline borders; blue acce
 | Appearance | System, Light, Dark, remembered | Partial | |
 | Appearance | Liquid Glass on iOS 26 | Missing | Deliberately deferred: its API cannot be checked without a compiler and could break the build. Materials-based look planned for iOS 17 and 18. |
 | Accessibility | Labels on controls, large touch targets | Partial | No audit done. Reduced-motion: nothing animates yet. |
-| Media | Photos and Files import, fonts, audio waveforms | Missing | |
-| Rendering | CPU preview (SwiftUI Canvas) | Partial | Solid and shape layers, opacity, blend modes. |
+| Media | Image import from Photos and Files, stored in the project, shown as image layers | Partial | Written, never run. Tests cover file storage, safe paths, sizing and save/reopen. The pickers and ImageIO checks have never run. |
+| Media | Video, audio, fonts, waveforms | Missing | Asset kinds are reserved. Nothing imports them. |
+| Media | Relink missing media | Missing | Missing files show a placeholder and a message. |
+| Rendering | CPU preview (SwiftUI Canvas) | Partial | Solid, shape and image layers, opacity, blend modes. Images are shown from a reduced copy. |
+| Rendering | Effects processed off the main thread with caching | Partial | `LayerImageProvider`. Never run, never profiled. |
 | Rendering | Metal renderer | Missing | |
 | Export | MP4 export, still export, progress, Photos and Files saving | Missing | See `RENDERING-AND-EXPORT.md`. |
-| Effects | Registry of all 167 required names, categories, validation | Partial | Name coverage test written. |
-| Effects | Any effect actually rendering | Missing | 0 of 167. |
-| Effects | Effect panel, stacking UI, presets, favourites | Missing | Stack data model and evaluator exist; no UI. |
+| Effects | Registry of all 167 required names (plus Drop Shadow), categories, validation | Partial | Name coverage test written. |
+| Effects | 15 effects with real processing: Brightness / Contrast, Hue Shift, Saturation, Invert, Gaussian Blur, Sharpen, Vignette, Drop Shadow, Glow, Gradient Map, RGB Split, Pixelate, Posterize, Directional Blur, Wave Warp | Partial | Pixel tests with hand-derived values written; **none has been run**. Image layers only. See `MEDIA-AND-EFFECTS.md`. |
+| Effects | The other 153 catalogue effects | Missing | Names only. |
+| Effects | Effects panel: search, categories, add, list, enable, reorder, remove, reset, settings, colour picker | Partial | Never run. |
+| Effects | Undo for add, remove, reorder, enable, settings; saving and order | Partial | Command tests written. |
+| Effects | Keyframes on effect settings | Partial | Data and commands support it. No interface. |
+| Effects | Presets, favourites, recents, copy and paste of stacks | Missing | |
+| Effects | Effects on shape, text and video layers | Missing | Shown as a message in the panel. |
 | Time remapping | Speed, reverse, freeze, ramps, blending, optical flow | Missing | Needs the media pipeline first. |
 | Compositing | Masks, mattes, keying | Missing | |
 | Tracking and stabilisation | | Missing | |

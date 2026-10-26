@@ -11,4 +11,9 @@ public enum EditError: Error, Equatable {
     case keyframeNotFound
     case keyframeOccupied
     case invalidValue
+    case effectNotFound
+    case effectUnavailable
+    case parameterNotFound
+    case unsupportedLayerType
+    case invalidAsset
 }

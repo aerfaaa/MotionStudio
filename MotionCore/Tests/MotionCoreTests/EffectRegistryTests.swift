@@ -9,10 +9,13 @@ final class EffectRegistryTests: XCTestCase {
         XCTAssertTrue(missing.isEmpty, "Missing from the catalogue: \(missing)")
     }
 
-    func testTheCatalogueHasNoExtraOrDuplicateNames() {
+    func testTheCatalogueHasNoDuplicatesAndOnlyKnownExtras() {
         XCTAssertEqual(requiredEffectNames.count, Set(requiredEffectNames).count, "the required list has duplicates")
-        XCTAssertEqual(EffectRegistry.all.count, requiredEffectNames.count)
-        XCTAssertEqual(Set(EffectRegistry.all.map { $0.name }), Set(requiredEffectNames))
+        let names = EffectRegistry.all.map { $0.name }
+        XCTAssertEqual(names.count, Set(names).count, "the catalogue has duplicate names")
+        // The only entry beyond the required list is Drop Shadow, which this release needs.
+        let extras = Set(names).subtracting(requiredEffectNames)
+        XCTAssertEqual(extras, ["Drop Shadow"])
     }
 
     func testSpecialCharactersInNamesArePreserved() {
@@ -41,10 +44,16 @@ final class EffectRegistryTests: XCTestCase {
         XCTAssertEqual(total, EffectRegistry.all.count)
     }
 
-    func testNoEffectClaimsToBeFinishedBeforeItRenders() {
-        // Nothing renders effects yet, so every effect must still say "missing".
-        // When a renderer for an effect lands, change its status and add a rendering test for it.
-        XCTAssertTrue(EffectRegistry.all.allSatisfy { $0.status == .missing })
+    func testAnEffectIsNeverLabelledFinishedWithoutProcessingCode() {
+        for definition in EffectRegistry.all {
+            if ImageEffects.isAvailable(definition.id) {
+                XCTAssertEqual(definition.status, .partial, definition.name)
+            } else {
+                XCTAssertEqual(definition.status, .missing, definition.name)
+            }
+        }
+        // Nothing is "working" until its tests have been run and have passed.
+        XCTAssertFalse(EffectRegistry.all.contains(where: { $0.status == .working }))
     }
 
     func testSearch() {
