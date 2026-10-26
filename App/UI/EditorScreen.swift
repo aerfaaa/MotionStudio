@@ -6,9 +6,17 @@ import MotionCore
 private enum LowerTab: String, CaseIterable, Identifiable {
     case timeline = "Timeline"
     case properties = "Properties"
+    case effects = "Effects"
+
     var id: String { rawValue }
 }
 
+private enum SideTab: String, CaseIterable, Identifiable {
+    case properties = "Properties"
+    case effects = "Effects"
+
+    var id: String { rawValue }
+}
 /// The editing workspace. It rearranges itself for the space it is given:
 /// - narrow screens (iPhone portrait, small iPad windows): preview on top, tabbed panel below
 /// - short wide screens (iPhone landscape): preview beside a tabbed panel
