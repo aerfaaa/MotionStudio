@@ -163,7 +163,7 @@ final class EffectCommandTests: XCTestCase {
         s.doc.undo()
         guard case .scalar(let radius)? = effects(s)[0].parameters["radius"] else { return XCTFail("no radius") }
         XCTAssertEqual(radius.staticValue, 10, "back to the default it had before the drag")
-        XCTAssertNotEqual(s.doc.project, before, "the effect itself is still there")
+        XCTAssertEqual(s.doc.project, before, "the effect itself is still there")
     }
 
     func testAnAnimatedSettingGetsAKeyframeInsteadOfAFixedValue() throws {
