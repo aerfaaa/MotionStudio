@@ -212,21 +212,59 @@ final class EffectCommandTests: XCTestCase {
         XCTAssertEqual(radius.staticValue, 10)
     }
 
-    func testEveryEffectEditCanBeUndoneAndRedone() throws {
-        let s = try setUpDocument()
-        let start = s.doc.project
-        let id = try add(s, "vignette")
-        try s.doc.perform(SetEffectParameters(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id, values: ["intensity": [0.9]]))
-        try s.doc.perform(MoveEffect(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id, newIndex: 0))
-        try s.doc.perform(RemoveEffect(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id))
-        let end = s.doc.project
-        for _ in 0..<4 { s.doc.undo() }
-        XCTAssertEqual(s.doc.project.rootComposition.layer(withID: s.imageLayerID)?.effects.count, 0)
-        for _ in 0..<4 { s.doc.redo() }
-        XCTAssertEqual(s.doc.project, end)
-        XCTAssertNotEqual(start, end)
+   func testEveryEffectEditCanBeUndoneAndRedone() throws {
+    let s = try setUpDocument()
+    let start = s.doc.project
+
+    let id = try add(s, "vignette")
+
+    try s.doc.perform(
+        SetEffectParameters(
+            compositionID: s.compID,
+            layerID: s.imageLayerID,
+            instanceID: id,
+            values: ["intensity": [0.9]]
+        )
+    )
+
+    _ = try add(s, "gaussian-blur")
+
+    try s.doc.perform(
+        MoveEffect(
+            compositionID: s.compID,
+            layerID: s.imageLayerID,
+            instanceID: id,
+            newIndex: 0
+        )
+    )
+
+    try s.doc.perform(
+        RemoveEffect(
+            compositionID: s.compID,
+            layerID: s.imageLayerID,
+            instanceID: id
+        )
+    )
+
+    let end = s.doc.project
+
+    for _ in 0..<5 {
+        XCTAssertTrue(s.doc.undo(), "each edit should be undoable")
     }
 
+    XCTAssertEqual(
+        s.doc.project.rootComposition.layer(withID: s.imageLayerID)?.effects.count,
+        0,
+        "undoing all edits should remove all effects"
+    )
+
+    for _ in 0..<5 {
+        XCTAssertTrue(s.doc.redo(), "each edit should be redoable")
+    }
+
+    XCTAssertEqual(s.doc.project, end, "redo should restore the final project")
+    XCTAssertNotEqual(start, end, "the final project should differ from the starting project")
+}
     // MARK: Saving
 
     func testEffectStacksSurviveSavingWithOrderEnabledStateAndValues() throws {
