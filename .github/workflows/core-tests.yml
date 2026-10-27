@@ -1,0 +1,46 @@
+# Runs the MotionCore unit tests. Manual only: nothing runs until you press "Run workflow"
+# on the Actions tab of your GitHub repository.
+name: Core tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repository checks (no compiler needed)
+        run: python3 scripts/check_repository.py
+
+      - name: Show tool versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Run MotionCore tests
+        working-directory: MotionCore
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee ../core-tests.log
+
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-tests-log
+          path: core-tests.log
+
+  # Optional second opinion on Linux (faster and cheaper). A failure here does not fail the run.
+  linux:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.10"
+      - name: Run MotionCore tests
+        working-directory: MotionCore
+        run: swift test
