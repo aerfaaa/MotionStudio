@@ -5,7 +5,7 @@ import Foundation
 /// Reuses generators and requests frames asynchronously. This keeps decode work out of the
 /// preview's synchronous path and allows AVFoundation to schedule its own decode work.
 /// This is still a frame-extraction fallback, not a replacement for AVPlayerItemVideoOutput.
-private enum VideoFrameGeneratorPool {
+enum VideoFrameGeneratorPool {
     private final class Box: NSObject {
         let generator: AVAssetImageGenerator
 
