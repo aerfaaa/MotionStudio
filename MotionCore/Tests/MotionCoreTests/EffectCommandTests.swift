@@ -153,19 +153,31 @@ final class EffectCommandTests: XCTestCase {
     }
 
     func testDraggingASliderIsOneUndoStep() throws {
-        let s = try setUpDocument()
-        let id = try add(s, "gaussian-blur")
-        let before = s.doc.project
-        for radius in [5.0, 10, 15, 20] {
-            try s.doc.perform(SetEffectParameters(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id,
-                                                  values: ["radius": [radius]], coalescingKey: "slider"))
-        }
-        s.doc.undo()
-        guard case .scalar(let radius)? = effects(s)[0].parameters["radius"] else { return XCTFail("no radius") }
-        XCTAssertEqual(radius.staticValue, 10, "back to the default it had before the drag")
-        XCTAssertNotEqual(s.doc.project, before, "the effect itself is still there")
+    let s = try setUpDocument()
+    let id = try add(s, "gaussian-blur")
+    let before = s.doc.project
+
+    for radius in [5.0, 10, 15, 20] {
+        try s.doc.perform(
+            SetEffectParameters(
+                compositionID: s.compID,
+                layerID: s.imageLayerID,
+                instanceID: id,
+                values: ["radius": [radius]],
+                coalescingKey: "slider"
+            )
+        )
     }
 
+    XCTAssertTrue(s.doc.undo())
+
+    guard case .scalar(let radius)? = effects(s)[0].parameters["radius"] else {
+        return XCTFail("no radius")
+    }
+
+    XCTAssertEqual(radius.staticValue, 10, "back to the default it had before the drag")
+    XCTAssertEqual(s.doc.project, before, "undo should restore the project before the slider drag")
+}
     func testAnAnimatedSettingGetsAKeyframeInsteadOfAFixedValue() throws {
         let s = try setUpDocument()
         let id = try add(s, "brightness-contrast")
