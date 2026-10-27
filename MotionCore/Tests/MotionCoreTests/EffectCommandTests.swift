@@ -1,3 +1,4 @@
+
 import XCTest
 @testable import MotionCore
 
@@ -156,14 +157,20 @@ final class EffectCommandTests: XCTestCase {
         let s = try setUpDocument()
         let id = try add(s, "gaussian-blur")
         let before = s.doc.project
+
         for radius in [5.0, 10, 15, 20] {
             try s.doc.perform(SetEffectParameters(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id,
                                                   values: ["radius": [radius]], coalescingKey: "slider"))
         }
+
         s.doc.undo()
-        guard case .scalar(let radius)? = effects(s)[0].parameters["radius"] else { return XCTFail("no radius") }
-        XCTAssertEqual(radius.staticValue, 10, "back to the default it had before the drag")
-        XCTAssertNotEqual(s.doc.project, before, "the effect itself is still there")
+
+        XCTAssertEqual(s.doc.project, before, "one undo should reverse the entire slider drag")
+
+        guard case .scalar(let radius)? = effects(s)[0].parameters["radius"] else {
+            return XCTFail("no radius")
+        }
+        XCTAssertEqual(radius.staticValue, 10)
     }
 
     func testAnAnimatedSettingGetsAKeyframeInsteadOfAFixedValue() throws {
@@ -203,16 +210,30 @@ final class EffectCommandTests: XCTestCase {
     func testEveryEffectEditCanBeUndoneAndRedone() throws {
         let s = try setUpDocument()
         let start = s.doc.project
+
         let id = try add(s, "vignette")
         try s.doc.perform(SetEffectParameters(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id, values: ["intensity": [0.9]]))
-        try s.doc.perform(MoveEffect(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id, newIndex: 0))
+
+        // Add a second effect so reordering is a real change.
+        let secondID = try add(s, "invert")
+        try s.doc.perform(MoveEffect(compositionID: s.compID, layerID: s.imageLayerID, instanceID: secondID, newIndex: 0))
+
         try s.doc.perform(RemoveEffect(compositionID: s.compID, layerID: s.imageLayerID, instanceID: id))
+
         let end = s.doc.project
-        for _ in 0..<4 { s.doc.undo() }
-        XCTAssertEqual(s.doc.project.rootComposition.layer(withID: s.imageLayerID)?.effects.count, 0)
-        for _ in 0..<4 { s.doc.redo() }
-        XCTAssertEqual(s.doc.project, end)
-        XCTAssertNotEqual(start, end)
+
+        // Five real edits: add, change, add, move, remove.
+        for _ in 0..<5 {
+            XCTAssertTrue(s.doc.undo(), "each edit should be undoable")
+        }
+
+        XCTAssertEqual(s.doc.project, start, "undo should restore the original project")
+
+        for _ in 0..<5 {
+            XCTAssertTrue(s.doc.redo(), "each edit should be redoable")
+        }
+
+        XCTAssertEqual(s.doc.project, end, "redo should restore the final project")
     }
 
     // MARK: Saving
