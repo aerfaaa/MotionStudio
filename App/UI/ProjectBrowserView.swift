@@ -383,8 +383,6 @@ private struct ProjectThumbnail: View {
     }
 }
 
-/// Settings: appearance for now.
-@MainActor
 /// Settings: appearance, editing and export preferences.
 @MainActor
 struct SettingsSheet: View {
