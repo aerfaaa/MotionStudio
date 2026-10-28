@@ -1,0 +1,54 @@
+# XcodeGen recipe. The build machine reads this file and generates MotionStudio.xcodeproj,
+# so nobody has to create or edit an Xcode project by hand (you have no Mac).
+name: MotionStudio
+
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+packages:
+  MotionCore:
+    path: MotionCore
+
+targets:
+  MotionStudio:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: MotionCore
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: Motion Studio
+        # Without this key iOS runs the app letterboxed instead of using the whole screen.
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Shows the Projects folder in the Files app.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        NSPhotoLibraryAddUsageDescription: "Save MotionStudio exports to your Photos library when you enable this option."
+        # Lets iPhones with 120 Hz screens animate faster than 60 Hz.
+        CADisableMinimumFrameDurationOnPhone: true
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.motionstudio
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
