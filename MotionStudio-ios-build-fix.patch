@@ -1,0 +1,37 @@
+diff --git a/App/Rendering/CanvasRenderer.swift b/App/Rendering/CanvasRenderer.swift
+--- a/App/Rendering/CanvasRenderer.swift
++++ b/App/Rendering/CanvasRenderer.swift
+@@ -57,12 +57,13 @@ enum CanvasRenderer {
+         let rect = CGRect(x: viewport.origin.x, y: viewport.origin.y,
+                           width: Double(frame.width) * viewport.scale,
+                           height: Double(frame.height) * viewport.scale)
+-        context.fill(Path(rect), with: .color(frame.background.color))
+-        context.clip(to: Path(rect))
+-        let resolved = context.resolve(Image(decorative: image, scale: 1))
+-        context.draw(resolved, in: rect)
+-        context.stroke(Path(rect), with: .color(Theme.hairline), lineWidth: 1)
+-        drawSelection(frame: frame, selectedLayerID: selectedLayerID, viewport: viewport, context: context)
++        // GraphicsContext is a value type; clip(to:) mutates it, so use a local copy.
++        var drawingContext = context
++        drawingContext.fill(Path(rect), with: .color(frame.background.color))
++        drawingContext.clip(to: Path(rect))
++        let resolved = drawingContext.resolve(Image(decorative: image, scale: 1))
++        drawingContext.draw(resolved, in: rect)
++        drawingContext.stroke(Path(rect), with: .color(Theme.hairline), lineWidth: 1)
++        drawSelection(frame: frame, selectedLayerID: selectedLayerID, viewport: viewport, context: drawingContext)
+     }
+
+diff --git a/App/UI/ProjectBrowserView.swift b/App/UI/ProjectBrowserView.swift
+--- a/App/UI/ProjectBrowserView.swift
++++ b/App/UI/ProjectBrowserView.swift
+@@ -455,12 +455,14 @@ struct SettingsSheet: View {
+-                Section("Editing") {
++                Section {
+                     Toggle("Haptic feedback", isOn: $hapticsEnabled)
+                     Toggle("Alignment and snapping guides", isOn: $showAlignmentGuides)
+                     Toggle("Snap clips together", isOn: $clipEdgeSnapping)
++                } header: {
++                    Text("Editing")
+                 } footer: {
+                     Text("Haptics apply to supported buttons, keyframe controls, layer reordering and clip-edge snapping. Guides include composition thirds, safe margins and coloured centre-snap lines. Clip snapping aligns a dragged clip's start or end to another clip's edge, the composition bounds, or a frame boundary.")
+                 }
