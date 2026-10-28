@@ -54,15 +54,30 @@ enum CanvasRenderer {
                                    selectedLayerID: UUID?,
                                    viewport: Viewport,
                                    context: GraphicsContext) {
-        let rect = CGRect(x: viewport.origin.x, y: viewport.origin.y,
+                let rect = CGRect(x: viewport.origin.x, y: viewport.origin.y,
                           width: Double(frame.width) * viewport.scale,
                           height: Double(frame.height) * viewport.scale)
-        context.fill(Path(rect), with: .color(frame.background.color))
-        context.clip(to: Path(rect))
-        let resolved = context.resolve(Image(decorative: image, scale: 1))
-        context.draw(resolved, in: rect)
-        context.stroke(Path(rect), with: .color(Theme.hairline), lineWidth: 1)
-        drawSelection(frame: frame, selectedLayerID: selectedLayerID, viewport: viewport, context: context)
+
+        var drawingContext = context
+        drawingContext.fill(Path(rect), with: .color(frame.background.color))
+        drawingContext.clip(to: Path(rect))
+
+        let resolved = drawingContext.resolve(
+            Image(decorative: image, scale: 1)
+        )
+        drawingContext.draw(resolved, in: rect)
+        drawingContext.stroke(
+            Path(rect),
+            with: .color(Theme.hairline),
+            lineWidth: 1
+        )
+
+        drawSelection(
+            frame: frame,
+            selectedLayerID: selectedLayerID,
+            viewport: viewport,
+            context: drawingContext
+        )
     }
 
     /// An imported picture, after its effects. While the picture is still loading, or if its file is missing,
