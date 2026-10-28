@@ -385,6 +385,8 @@ private struct ProjectThumbnail: View {
 
 /// Settings: appearance for now.
 @MainActor
+/// Settings: appearance, editing and export preferences.
+@MainActor
 struct SettingsSheet: View {
     @AppStorage(AppearanceSetting.storageKey) private var appearanceName = AppearanceSetting.system.rawValue
     @AppStorage("motionStudioAccentHex") private var accentHex = "#648CFF"
@@ -396,8 +398,12 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private let accentPresets: [(String, String)] = [
-        ("Blue", "#648CFF"), ("Violet", "#A78BFA"), ("Mint", "#48D7B0"),
-        ("Coral", "#FF7A70"), ("Pink", "#F472B6"), ("Amber", "#F5B84B")
+        ("Blue", "#648CFF"),
+        ("Violet", "#A78BFA"),
+        ("Mint", "#48D7B0"),
+        ("Coral", "#FF7A70"),
+        ("Pink", "#F472B6"),
+        ("Amber", "#F5B84B")
     ]
 
     var body: some View {
@@ -415,32 +421,60 @@ struct SettingsSheet: View {
                 } footer: {
                     Text("System follows your device setting.")
                 }
+
                 Section {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 82), spacing: 10)], spacing: 10) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 82), spacing: 10)],
+                        spacing: 10
+                    ) {
                         ForEach(accentPresets, id: \.1) { preset in
                             Button {
                                 accentHex = preset.1
                                 customAccent = Color(hex: preset.1)
                             } label: {
                                 HStack(spacing: 7) {
-                                    Circle().fill(Color(hex: preset.1)).frame(width: 15, height: 15)
-                                    Text(preset.0).font(.caption.weight(.medium))
+                                    Circle()
+                                        .fill(Color(hex: preset.1))
+                                        .frame(width: 15, height: 15)
+
+                                    Text(preset.0)
+                                        .font(.caption.weight(.medium))
+
                                     if accentHex.uppercased() == preset.1 {
-                                        Image(systemName: "checkmark").font(.caption2.bold())
+                                        Image(systemName: "checkmark")
+                                            .font(.caption2.bold())
                                     }
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 36)
                                 .padding(.horizontal, 8)
-                                .background(accentHex.uppercased() == preset.1 ? Color(hex: preset.1).opacity(0.16) : Theme.surfaceRaised,
-                                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.hairline))
+                                .background(
+                                    accentHex.uppercased() == preset.1
+                                        ? Color(hex: preset.1).opacity(0.16)
+                                        : Theme.surfaceRaised,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 10,
+                                        style: .continuous
+                                    )
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .strokeBorder(Theme.hairline)
+                                )
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(Theme.textPrimary)
                         }
                     }
-                    ColorPicker("Custom accent", selection: $customAccent, supportsOpacity: false)
-                        .onChange(of: customAccent) { _, newColor in accentHex = newColor.hexRGB }
+
+                    ColorPicker(
+                        "Custom accent",
+                        selection: $customAccent,
+                        supportsOpacity: false
+                    )
+                    .onChange(of: customAccent) { _, newColor in
+                        accentHex = newColor.hexRGB
+                    }
+
                     HStack {
                         Text("Accent preview")
                         Spacer()
@@ -449,29 +483,52 @@ struct SettingsSheet: View {
                             .foregroundStyle(Theme.accent)
                     }
                     .padding(10)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(
+                        .ultraThinMaterial,
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
                 } header: {
                     Text("Accent colour")
                 } footer: {
                     Text("Changes the timeline playhead, selected controls and accent highlights. It is saved on this device, not inside individual projects.")
                 }
+
                 Section {
-    Toggle("Haptic feedback", isOn: $hapticsEnabled)
-    Toggle("Alignment and snapping guides", isOn: $showAlignmentGuides)
-    Toggle("Snap clips together", isOn: $clipEdgeSnapping)
-} header: {
-    Text("Editing")
-} footer: {
-    Text("Haptics apply to supported buttons, keyframe controls, layer reordering and clip-edge snapping. Guides include composition thirds, safe margins and coloured centre-snap lines. Clip snapping aligns a dragged clip's start or end to another clip's edge, the composition bounds, or a frame boundary.")
-}
+                    Toggle("Haptic feedback", isOn: $hapticsEnabled)
+                    Toggle("Alignment and snapping guides", isOn: $showAlignmentGuides)
+                    Toggle("Snap clips together", isOn: $clipEdgeSnapping)
+                } header: {
+                    Text("Editing")
+                } footer: {
+                    Text("Haptics apply to supported buttons, keyframe controls, layer reordering and clip-edge snapping. Guides include composition thirds, safe margins and coloured centre-snap lines. Clip snapping aligns a dragged clip's start or end to another clip's edge, the composition bounds, or a frame boundary.")
+                }
+
+                Section {
+                    Toggle(
+                        "Save exports to Photos automatically",
+                        isOn: $saveExportsToPhotos
+                    )
+                } header: {
+                    Text("Export")
+                } footer: {
+                    Text("When enabled, completed video and still exports are added to Photos. MotionStudio requests add-only Photos access the first time you export.")
+                }
+            }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
-            .onAppear { customAccent = Color(hex: accentHex) }
+            .onAppear {
+                customAccent = Color(hex: accentHex)
+            }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        dismiss()
+                    }
                 }
             }
         }
