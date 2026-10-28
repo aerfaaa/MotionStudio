@@ -49,7 +49,11 @@ enum VideoFrameGeneratorPool {
         if fraction < 0.015 { return await image(url: url, maxPixel: maxPixel, seconds: lower, exact: true) }
         let a = await image(url: url, maxPixel: maxPixel, seconds: lower, exact: true)
         let b = await image(url: url, maxPixel: maxPixel, seconds: lower + frameDuration, exact: true)
-        guard let a, let b else { return a ?? b }
+      guard let a, let b else {
+    // If either neighbouring frame fails to decode, do not pretend
+    // that a single frame is a valid interpolated frame.
+    return nil
+}
         return await Task.detached(priority: .userInitiated) {
             OpticalFlowInterpolator.interpolate(a, b, amount: CGFloat(fraction))
         }.value
