@@ -185,9 +185,9 @@ struct InspectorView: View {
     }
 
     private func playbackSpeedRow(_ layer: Layer) -> some View {
-        let opticalFlowEnabled = layer.effects.contains(where: { $0.effectID == "optical-flow-slow-motion" && $0.isEnabled })
+               let opticalFlowEnabled = layer.effects.contains(where: { $0.effectID == "optical-flow-slow-motion" && $0.isEnabled })
         let isVideoLayer: Bool = { if case .video = layer.kind { return true }; return false }()
-        VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Label(isVideoLayer && opticalFlowEnabled ? "Video playback speed" : "Animation speed", systemImage: "speedometer")
                     .font(.subheadline.weight(.medium))
