@@ -210,7 +210,7 @@ struct InspectorView: View {
 
     private func universalRecolourControl(_ layer: Layer) -> some View {
                 let currentTime = model.currentTime
-        ColorPicker("Recolour layer", selection: Binding<Color>(
+        return ColorPicker("Recolour layer", selection: Binding<Color>(
             get: {
                 let effect = model.selectedLayer?.effects.first(where: { $0.effectID == "colorize" })
                 func value(_ key: String, _ fallback: Double) -> Double {
