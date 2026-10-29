@@ -180,12 +180,11 @@ final class LayerImageProvider {
         let mappedVideoTicks = isVideo ? Int64(max(0, (layer.videoSourceTimeSeconds ?? time.seconds) * Double(MotionCore.Time.ticksPerSecond)).rounded()) : nil
         let videoTicks = isVideo ? (playbackPreview ? quantizedVideoTicks(mappedVideoTicks ?? time.ticks) : mappedVideoTicks) : nil
         if isVideo, let videoTicks { requestedVideoFrameTicks[assetID] = videoTicks }
-       let flowEnabled = isVideo
-    && layer.effects.contains(where: {
-        $0.effectID == "optical-flow-slow-motion"
-            && $0.isEnabled
-    })
-    && layer.playbackSpeed < 0.999
+               let flowEnabled = isVideo
+            && layer.effects.contains(where: {
+                $0.effectID == "optical-flow-slow-motion"
+            })
+            && layer.playbackSpeed < 0.999
         let sourceKey = SourceKey(assetID: assetID, maxPixel: maxPixel, frameTicks: videoTicks,
                                   exactVideoFrame: isVideo && exactVideoFrame,
                                   interpolateSlowMotion: flowEnabled && exactVideoFrame)
