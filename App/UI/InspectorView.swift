@@ -17,8 +17,13 @@ struct InspectorView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     RenameField(layerName: layer.name) { model.rename(layer.id, to: $0) }
                         .id(layer.id)
-                    if layer.kind != .audio && layer.kind != .null { universalRecolourControl(layer) }
-
+                                        if case .audio = layer.kind {
+                        EmptyView()
+                    } else if case .null = layer.kind {
+                        EmptyView()
+                    } else {
+                        universalRecolourControl(layer)
+                    }
                     switch layer.kind {
                     case .image(let assetID):
                         imageInfo(layer: layer, assetID: assetID)
