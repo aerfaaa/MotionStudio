@@ -209,12 +209,13 @@ struct InspectorView: View {
     }
 
     private func universalRecolourControl(_ layer: Layer) -> some View {
+                let currentTime = model.currentTime
         ColorPicker("Recolour layer", selection: Binding<Color>(
             get: {
                 let effect = model.selectedLayer?.effects.first(where: { $0.effectID == "colorize" })
                 func value(_ key: String, _ fallback: Double) -> Double {
                     guard let parameter = effect?.parameters[key] else { return fallback }
-                    if case .scalar(let track) = parameter { return track.value(at: model.currentTime) }
+                    if case .scalar(let track) = parameter { return track.value(at: currentTime) }
                     return fallback
                 }
                 return Color(red: value("tintRed", 1), green: value("tintGreen", 0.35), blue: value("tintBlue", 0.1))
