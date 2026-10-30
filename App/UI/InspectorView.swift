@@ -17,6 +17,8 @@ struct InspectorView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     RenameField(layerName: layer.name) { model.rename(layer.id, to: $0) }
                         .id(layer.id)
+                    timelineColorControl(layer)
+                    blendModeControl(layer)
                     if layer.kind != .audio && layer.kind != .null { universalRecolourControl(layer) }
 
                     switch layer.kind {
@@ -26,6 +28,7 @@ struct InspectorView: View {
                         videoInfo(layer: layer, assetID: assetID)
                     case .audio(let assetID):
                         audioInfo(assetID: assetID)
+                        audioVolumeControl(layer)
                     case .text(let content):
                         textEditor(layer: layer, content: content)
                     case .adjustment:
@@ -66,6 +69,7 @@ struct InspectorView: View {
                     }
 
                     HStack(spacing: 10) {
+                        actionButton("Split at Playhead", systemName: "scissors") { model.splitSelectedAtPlayhead() }
                         actionButton("Duplicate", systemName: "plus.square.on.square") { model.duplicateSelected() }
                         actionButton("Delete", systemName: "trash", isDestructive: true) { model.deleteSelected() }
                     }
@@ -143,6 +147,53 @@ struct InspectorView: View {
                 .accessibilityHint("Drag in any direction to move the selected layer without covering the preview.")
             }
             .frame(height: 84)
+        }
+    }
+
+    private func timelineColorControl(_ layer: Layer) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Timeline label colour").font(.subheadline.weight(.medium))
+                Spacer()
+                if layer.timelineColor != nil {
+                    Button("Reset") { model.setTimelineColor(layer.id, to: nil) }
+                        .font(.caption.weight(.semibold))
+                }
+            }
+            ColorPicker("Clip colour only", selection: Binding<Color>(
+                get: { (layer.timelineColor ?? layer.fill).color },
+                set: { model.setTimelineColor(layer.id, to: RGBA(color: $0)) }
+            ), supportsOpacity: false)
+            Text("This changes only the timeline bar, not the clip's visible colour.")
+                .font(.caption).foregroundStyle(Theme.textSecondary)
+        }
+    }
+
+    private func blendModeControl(_ layer: Layer) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Blending").font(.subheadline.weight(.medium))
+            Picker("Blend mode", selection: Binding(get: { layer.blendMode }, set: { model.setBlendMode(layer.id, to: $0) })) {
+                Text("Normal").tag(BlendMode.normal)
+                Text("Add").tag(BlendMode.add)
+                Text("Multiply").tag(BlendMode.multiply)
+                Text("Screen").tag(BlendMode.screen)
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+
+    private func audioVolumeControl(_ layer: Layer) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Volume").font(.subheadline.weight(.medium))
+                Spacer()
+                Text("\(Int(layer.audioVolume * 100))%")
+                    .font(.caption.monospacedDigit()).foregroundStyle(Theme.textSecondary)
+            }
+            RulerValueControl(value: Binding(get: { layer.audioVolume * 100 }, set: { model.setAudioVolume(layer.id, to: $0 / 100) }),
+                              range: 0...100, step: 1, suffix: "%")
+            Text("This gain is used for timeline playback and mixed video exports.")
+                .font(.caption).foregroundStyle(Theme.textSecondary)
         }
     }
 
@@ -266,7 +317,7 @@ struct InspectorView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.danger)
             }
-            Text("Audio clip is on the timeline. Synchronized audio playback is not implemented yet.")
+            Text("Audio follows timeline playback. Use the volume control above to adjust this clip; the same gain is used in video exports.")
                 .font(.caption)
                 .foregroundStyle(Theme.textSecondary)
         }
@@ -360,10 +411,10 @@ struct InspectorView: View {
             current = layer.scalarValue(key, at: model.currentTime) ?? 0
         }
         let binding = Binding<Double>(
-            get: { current },
-            set: { newValue in
+            get: { current * unit },
+            set: { displayedValue in
+                let newValue = displayedValue / unit
                 if key.isVector {
-                    // Only used for properties that hold a single number in the slider (none at present).
                     model.setVector(key, of: layer.id, to: Vec2(x: newValue, y: newValue), coalescing: true)
                 } else {
                     model.setScalar(key, of: layer.id, to: newValue, coalescing: true)
@@ -383,10 +434,8 @@ struct InspectorView: View {
                     model.toggleKeyframe(key, layerID: layer.id)
                 }
             }
-            Slider(value: binding, in: range, onEditingChanged: { editing in
-                if !editing { model.endEditGroup() }
-            })
-            .accessibilityLabel(key.displayName)
+            RulerValueControl(value: binding, range: (range.lowerBound * unit)...(range.upperBound * unit), step: max((range.upperBound - range.lowerBound) * unit / 1000, 0.001), suffix: suffix)
+                .accessibilityLabel(key.displayName)
         }
     }
 

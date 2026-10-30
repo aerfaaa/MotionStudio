@@ -13,6 +13,11 @@ public enum ImageEffects {
         // processor makes the effect available in the shared effect browser without altering pixels.
         "optical-flow-slow-motion": identity,
         "brightness-contrast": brightnessContrast,
+        "color-tune": colorTune,
+        "glow-scan": glowScan,
+        "bloom": bloom,
+        "duotone": duotone,
+        "glitch-lines": glitchLines,
         "hue-shift": hueShift,
         "saturation-vibrance": saturation,
         "invert": invert,
@@ -180,6 +185,80 @@ public enum ImageEffects {
              (g - 0.5) * factor + 0.5 + brightness,
              (b - 0.5) * factor + 0.5 + brightness)
         }
+    }
+
+    // MARK: - Color Tune
+
+    /// Combines hue rotation, saturation and brightness in one lightweight pass.
+    private static func colorTune(_ image: PixelImage, _ v: EffectValues, _ scale: Double) -> PixelImage {
+        let hueOffset = Float(v.scalar("hue") / 360)
+        let saturation = Float(v.scalar("saturation"))
+        let brightness = Float(v.scalar("brightness"))
+        if hueOffset == 0 && saturation == 1 && brightness == 0 { return image }
+        return image.mapColors { r, g, b in
+            var hsv = rgbToHSV(r, g, b)
+            hsv.h += hueOffset
+            hsv.h -= hsv.h.rounded(.down)
+            hsv.s = min(1, max(0, hsv.s * saturation))
+            hsv.v = min(1, max(0, hsv.v + brightness))
+            return hsvToRGB(hsv.h, hsv.s, hsv.v)
+        }
+    }
+
+    /// A stylised CRT treatment: scan bands first, then a restrained highlight glow.
+    private static func glowScan(_ image: PixelImage, _ v: EffectValues, _ scale: Double) -> PixelImage {
+        guard !image.isEmpty else { return image }
+        let scanned = scanlines(image, v, scale)
+        let glowValues = EffectValues(values: [
+            "threshold": [v.scalar("threshold")],
+            "radius": [v.scalar("glowRadius")],
+            "intensity": [v.scalar("glowIntensity")],
+            "colorRed": [v.scalar("colorRed")],
+            "colorGreen": [v.scalar("colorGreen")],
+            "colorBlue": [v.scalar("colorBlue")],
+            "mode": [0]
+        ], definition: EffectRegistry.definition(id: "glow"))
+        return glow(scanned, glowValues, scale)
+    }
+
+    /// Soft highlight bloom, with controllable threshold, radius and intensity.
+    private static func bloom(_ image: PixelImage, _ v: EffectValues, _ scale: Double) -> PixelImage {
+        let settings = EffectValues(values: [
+            "threshold": [v.scalar("threshold")], "radius": [v.scalar("radius")],
+            "intensity": [v.scalar("intensity")], "colorRed": [1], "colorGreen": [1],
+            "colorBlue": [1], "mode": [0]
+        ], definition: EffectRegistry.definition(id: "glow"))
+        return glow(image, settings, scale)
+    }
+
+    /// Maps luminance between a shadow colour and a highlight colour.
+    private static func duotone(_ image: PixelImage, _ v: EffectValues, _ scale: Double) -> PixelImage {
+        let sr = Float(v.scalar("shadowRed")), sg = Float(v.scalar("shadowGreen")), sb = Float(v.scalar("shadowBlue"))
+        let hr = Float(v.scalar("highlightRed")), hg = Float(v.scalar("highlightGreen")), hb = Float(v.scalar("highlightBlue"))
+        return image.mapColors { r, g, b in
+            let luma = min(1, max(0, 0.2126 * r + 0.7152 * g + 0.0722 * b))
+            return (sr + (hr - sr) * luma, sg + (hg - sg) * luma, sb + (hb - sb) * luma)
+        }
+    }
+
+    /// Shifts short horizontal bands by different amounts for a controlled digital glitch.
+    private static func glitchLines(_ image: PixelImage, _ v: EffectValues, _ scale: Double) -> PixelImage {
+        guard !image.isEmpty else { return image }
+        let spacing = max(2, Int(v.scalar("spacing").rounded()))
+        let amount = max(0, v.scalar("amount") * scale)
+        let phase = v.scalar("phase")
+        var result = image
+        for y in 0..<image.height {
+            let band = y / spacing
+            let wave = sin(Double(band) * 2.17 + phase) + 0.45 * sin(Double(band) * 0.73 + phase * 1.7)
+            let offset = Int((wave * amount).rounded())
+            for x in 0..<image.width {
+                let sx = min(image.width - 1, max(0, x + offset))
+                let pixel = image.sample(x: Double(sx) + 0.5, y: Double(y) + 0.5)
+                result.setStraight(x, y, r: pixel.r, g: pixel.g, b: pixel.b, a: pixel.a)
+            }
+        }
+        return result
     }
 
     // MARK: - 2. Hue Shift

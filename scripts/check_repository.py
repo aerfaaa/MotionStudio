@@ -72,7 +72,7 @@ if os.path.exists(catalog) and os.path.exists(required_names):
     if missing_names:
         fail(f"effects required but not in the catalogue: {missing_names}")
     extras = sorted(set(in_catalog) - set(in_required))
-    if extras != ["Black & White", "Chromatic Aberration", "Drop Shadow", "Film Grain", "Liquid Glass", "Luma Fade", "Motion Tile", "Optical Flow Slow Motion", "Pixel Sort", "RGB Blur", "Radial Blur", "Scanlines", "Sepia Tone", "Solarize", "Tint", "VHS"]:
+    if extras != ["Black & White", "Bloom", "Chromatic Aberration", "Drop Shadow", "Duotone", "Film Grain", "Glitch Lines", "Liquid Glass", "Luma Fade", "Motion Tile", "Optical Flow Slow Motion", "Pixel Sort", "RGB Blur", "Radial Blur", "Scanlines", "Sepia Tone", "Solarize", "Tint", "VHS"]:
         fail(f"unexpected extra effects in the catalogue: {extras}")
     if len(set(in_catalog)) != len(in_catalog):
         fail("duplicate effect names in the catalogue")

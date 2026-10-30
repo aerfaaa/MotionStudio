@@ -272,7 +272,7 @@ final class EffectCommandTests: XCTestCase {
                                      "threshold", "luma-fade", "vhs", "pixel-sort", "rgb-blur", "motion-tile",
                                      "color-temperature", "colorize", "exposure-gamma", "find-edges", "flip-layer", "mirror", "mosaic",
                                      "black-white", "sepia-tone", "solarize", "tint", "chromatic-aberration", "film-grain", "scanlines",
-                                     "liquid-glass", "edge-glow", "radial-blur", "optical-flow-slow-motion"]
+                                     "liquid-glass", "edge-glow", "radial-blur", "optical-flow-slow-motion", "color-tune", "glow-scan", "bloom", "duotone", "glitch-lines"]
         XCTAssertEqual(Set(ImageEffects.availableIDs), expected)
         XCTAssertEqual(Set(EffectRegistry.available.map { $0.id }), expected)
         for id in expected {

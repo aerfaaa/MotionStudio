@@ -101,6 +101,12 @@ enum CanvasRenderer {
             context.fill(Path(ellipseIn: rect), with: .color(layer.fill.color))
         case .solid, .shape(.rectangle):
             context.fill(Path(rect), with: .color(layer.fill.color))
+        case .vectorPath(let points):
+            guard points.count >= 2 else { break }
+            var path = Path()
+            path.move(to: CGPoint(x: points[0].x, y: points[0].y))
+            for point in points.dropFirst() { path.addLine(to: CGPoint(x: point.x, y: point.y)) }
+            context.stroke(path, with: .color(layer.fill.color), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
         default:
             break
         }

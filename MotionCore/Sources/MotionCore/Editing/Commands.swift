@@ -490,3 +490,43 @@ public struct SetLayerTextFont: Command {
         }
     }
 }
+
+
+public struct SetLayerBlendMode: Command {
+    public let compositionID: UUID
+    public let layerID: UUID
+    public let blendMode: BlendMode
+    public init(compositionID: UUID, layerID: UUID, blendMode: BlendMode) {
+        self.compositionID = compositionID; self.layerID = layerID; self.blendMode = blendMode
+    }
+    public var name: String { "Change Blend Mode" }
+    public func apply(to project: inout Project) throws {
+        try project.updateLayer(compositionID, layerID) { $0.blendMode = blendMode }
+    }
+}
+
+public struct SetLayerTimelineColor: Command {
+    public let compositionID: UUID
+    public let layerID: UUID
+    public let color: RGBA?
+    public init(compositionID: UUID, layerID: UUID, color: RGBA?) {
+        self.compositionID = compositionID; self.layerID = layerID; self.color = color
+    }
+    public var name: String { "Change Timeline Colour" }
+    public func apply(to project: inout Project) throws {
+        try project.updateLayer(compositionID, layerID) { $0.timelineColor = color }
+    }
+}
+
+public struct SetLayerAudioVolume: Command {
+    public let compositionID: UUID
+    public let layerID: UUID
+    public let volume: Double
+    public init(compositionID: UUID, layerID: UUID, volume: Double) {
+        self.compositionID = compositionID; self.layerID = layerID; self.volume = min(max(volume.isFinite ? volume : 1, 0), 1)
+    }
+    public var name: String { "Change Audio Volume" }
+    public func apply(to project: inout Project) throws {
+        try project.updateLayer(compositionID, layerID) { $0.audioVolume = volume }
+    }
+}

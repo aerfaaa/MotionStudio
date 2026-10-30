@@ -31,8 +31,8 @@ public enum EffectPipeline {
             return (image, [EffectIssue(effectID: "", message: "The preview scale is invalid.")])
         }
         for effect in effects {
-            // Motion blur is temporal and transform-based. It is rendered by the composition
-            // renderer from Evaluator.motionBlurTransforms, never baked into a still bitmap.
+            // Motion blur is temporal and transform-based. Evaluator supplies past/future transforms;
+            // blurring the still bitmap here would make static images blurry rather than create motion trails.
             if effect.effectID == "motion-blur" { continue }
             guard let process = ImageEffects.processor(for: effect.effectID) else {
                 let known = EffectRegistry.definition(id: effect.effectID)

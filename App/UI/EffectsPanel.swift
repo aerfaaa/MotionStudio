@@ -105,6 +105,34 @@ struct EffectsPanel: View {
                                 model.addEffect("saturation-vibrance")
                                 model.addEffect("sharpen")
                             }
+                            quickLookButton("Dreamy", symbol: "cloud.fill") {
+                                model.addEffect("gaussian-blur")
+                                model.addEffect("glow")
+                                model.addEffect("vignette")
+                            }
+                            quickLookButton("Neon", symbol: "bolt.fill") {
+                                model.addEffect("edge-glow")
+                                model.addEffect("chromatic-aberration")
+                                model.addEffect("saturation-vibrance")
+                            }
+                            quickLookButton("Night vision", symbol: "eye.fill") {
+                                model.addEffect("colorize")
+                                model.addEffect("noise")
+                                model.addEffect("edge-glow")
+                            }
+                            quickLookButton("Bloom", symbol: "sun.max.fill") {
+                                model.addEffect("bloom")
+                                model.addEffect("vignette")
+                            }
+                            quickLookButton("Duotone", symbol: "circle.lefthalf.filled") {
+                                model.addEffect("duotone")
+                                model.addEffect("film-grain")
+                            }
+                            quickLookButton("Digital glitch", symbol: "waveform.path.ecg") {
+                                model.addEffect("glitch-lines")
+                                model.addEffect("rgb-split")
+                                model.addEffect("chromatic-aberration")
+                            }
                             quickLookButton("Mono", symbol: "circle.lefthalf.filled") {
                                 model.addEffect("black-white")
                                 model.addEffect("film-grain")
@@ -292,8 +320,33 @@ struct EffectsPanel: View {
             Text("\(definition.name) settings")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
-            if definition.parameters.isEmpty {
-                Text("This effect has no settings.")
+            if effect.effectID == "optical-flow-slow-motion" {
+                if let layer = model.selectedLayer, case .video = layer.kind {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Video speed")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.textPrimary)
+                            Spacer()
+                            Text(String(format: "%.2g×", layer.playbackSpeed))
+                                .font(.subheadline.monospacedDigit())
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        RulerValueControl(value: Binding(
+                            get: { layer.playbackSpeed },
+                            set: { model.setPlaybackSpeed(layer.id, to: $0) }
+                        ), range: 0.25...1.0, step: 0.05, suffix: "×")
+                        Text("Slows the source video and uses optical-flow frame synthesis during export. Preview scrubbing uses normal frame decoding to stay responsive; slower speeds can take longer to export.")
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                } else {
+                    Text("This is a video-only effect. Select a video layer to adjust its playback speed.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            } else if definition.parameters.isEmpty {
+                Text("This effect has no adjustable parameters.")
                     .font(.footnote)
                     .foregroundStyle(Theme.textSecondary)
             }
@@ -313,20 +366,12 @@ struct EffectsPanel: View {
         case .scalar(let minimum, let maximum, _):
             let value = current.first ?? minimum
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(rule.name)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textPrimary)
-                    Spacer()
-                    Text(String(format: "%.2f", value))
-                        .font(.subheadline)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                Slider(value: Binding(get: { value },
-                                      set: { model.setEffectValues(effect.id, [rule.id: [$0]], coalescing: true) }),
-                       in: minimum...maximum,
-                       onEditingChanged: { editing in if !editing { model.endEditGroup() } })
+                Text(rule.name)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textPrimary)
+                RulerValueControl(value: Binding(get: { value },
+                                                 set: { model.setEffectValues(effect.id, [rule.id: [$0]], coalescing: true) }),
+                                  range: minimum...maximum, step: max((maximum - minimum) / 1000, 0.001))
                     .accessibilityLabel(rule.name)
             }
         case .choice(let options, _):

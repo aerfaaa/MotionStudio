@@ -133,13 +133,16 @@ final class EditorModel {
         previewFrames[frame] != nil || previewDiskFrames.contains(frame)
     }
 
-    func cachedPreviewImage(at frame: Int64) -> CGImage? {
+    func cachedPreviewImage(at frame: Int64, allowDiskRead: Bool = true) -> CGImage? {
         if let image = previewFrames[frame] {
             touchMemoryFrame(frame)
             return image
         }
-        guard previewDiskFrames.contains(frame),
-              let source = CGImageSourceCreateWithURL(previewDiskURL(for: frame) as CFURL, nil),
+
+        // Disk JPEG decoding is synchronous. During playback, never block the main thread
+        // waiting for it; a live frame is preferable to a dropped frame.
+        guard allowDiskRead, previewDiskFrames.contains(frame) else { return nil }
+        guard let source = CGImageSourceCreateWithURL(previewDiskURL(for: frame) as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             removeDiskFrame(frame)
             return nil
@@ -321,6 +324,57 @@ final class EditorModel {
 
     func setFill(_ layerID: UUID, to fill: RGBA) {
         run(SetLayerFill(compositionID: compositionID, layerID: layerID, fill: fill))
+    }
+
+    func setBlendMode(_ layerID: UUID, to mode: BlendMode) {
+        run(SetLayerBlendMode(compositionID: compositionID, layerID: layerID, blendMode: mode))
+    }
+
+    func setTimelineColor(_ layerID: UUID, to color: RGBA?) {
+        run(SetLayerTimelineColor(compositionID: compositionID, layerID: layerID, color: color))
+    }
+
+    func setAudioVolume(_ layerID: UUID, to volume: Double) {
+        run(SetLayerAudioVolume(compositionID: compositionID, layerID: layerID, volume: volume))
+        audioPlayers[layerID]?.volume = Float(min(max(volume, 0), 1))
+    }
+
+    /// Splits the selected clip at the current frame. The original becomes the left segment; a copy
+    /// becomes the right segment, preserving its appearance, effects, transform and audio gain.
+    func splitSelectedAtPlayhead() {
+        guard let original = selectedLayer else { return }
+        let splitTime = composition.frameRate.time(ofFrame: composition.frameRate.frameIndex(at: currentTime))
+        guard splitTime > original.inPoint, splitTime < original.outPoint else {
+            lastError = "Move the playhead inside the selected clip before splitting it."
+            return
+        }
+        var right = original
+        right.id = UUID()
+        right.name = original.name + " (split)"
+        right.inPoint = splitTime
+        let splitOffset = max(0, splitTime.seconds - original.inPoint.seconds)
+        let isVideo: Bool = { if case .video = original.kind { return true }; return false }()
+        right.sourceOffsetSeconds = original.sourceOffsetSeconds + splitOffset * (isVideo ? original.playbackSpeed : 1)
+        let oldOut = original.outPoint
+        setLayerTiming(original.id, inPoint: original.inPoint, outPoint: splitTime, coalescing: false)
+        run(AddLayer(compositionID: compositionID, layer: right, index: (composition.index(ofLayer: original.id) ?? 0)))
+        setLayerTiming(right.id, inPoint: splitTime, outPoint: oldOut, coalescing: false)
+        selectedLayerID = right.id
+    }
+
+    /// Adds a freehand vector stroke. Input points are in composition pixel coordinates.
+    func addVectorDrawing(points: [Vec2]) {
+        guard points.count >= 2 else { return }
+        let minX = points.map(\.x).min() ?? 0, maxX = points.map(\.x).max() ?? 0
+        let minY = points.map(\.y).min() ?? 0, maxY = points.map(\.y).max() ?? 0
+        let width = max(2, maxX - minX), height = max(2, maxY - minY)
+        let localPoints = points.map { Vec2(x: $0.x - minX, y: $0.y - minY) }
+        let color = LayerPalette.colors[composition.layers.count % LayerPalette.colors.count]
+        let layer = Layer(name: nextName("Vector Drawing"), kind: .vectorPath(points: localPoints),
+                          size: Vec2(x: width, y: height), fill: color, inPoint: .zero,
+                          outPoint: composition.duration, position: Vec2(x: minX + width / 2, y: minY + height / 2))
+        run(AddLayer(compositionID: compositionID, layer: layer, index: 0))
+        selectedLayerID = layer.id
     }
 
     func setPlaybackSpeed(_ layerID: UUID, to speed: Double) {
@@ -741,6 +795,7 @@ final class EditorModel {
             audioPlayers[id]?.stop()
             audioPlayers[id] = nil
         }
+        for layer in active { audioPlayers[layer.id]?.volume = Float(layer.audioVolume) }
         for layer in active where audioPlayers[layer.id] == nil {
             guard case .audio(let assetID) = layer.kind,
                   let asset = project.assets.first(where: { $0.id == assetID }),
@@ -748,7 +803,8 @@ final class EditorModel {
             do {
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
                 let player = try AVAudioPlayer(contentsOf: url)
-                player.currentTime = max(0, time.seconds - layer.inPoint.seconds)
+                player.volume = Float(layer.audioVolume)
+                player.currentTime = max(0, layer.sourceOffsetSeconds + time.seconds - layer.inPoint.seconds)
                 player.prepareToPlay()
                 if player.play() { audioPlayers[layer.id] = player }
             } catch {

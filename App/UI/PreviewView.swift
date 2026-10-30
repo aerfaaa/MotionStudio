@@ -17,8 +17,8 @@ struct PreviewView: View {
 
     @State private var session: DragSession?
     @State private var sessionStarted = false
-    @State private var showingVerticalGuide = false
-    @State private var showingHorizontalGuide = false
+    @State private var verticalGuidePosition: Double?
+    @State private var horizontalGuidePosition: Double?
     @State private var scalingStart: (layerID: UUID, scale: Vec2)?
 
     var body: some View {
@@ -31,7 +31,7 @@ struct PreviewView: View {
             // preview redraw when one finishes.
             let _ = model.images.version
             let _ = model.previewCacheVersion
-            let cachedSnapshot = model.cachedPreviewImage(at: frame.frameIndex)
+            let cachedSnapshot = model.cachedPreviewImage(at: frame.frameIndex, allowDiskRead: !model.isPlaying)
             let images = cachedSnapshot == nil ? model.images.provideAll(for: frame, playbackPreview: model.isPlaying) : [:]
             let viewport = Viewport(compWidth: Double(composition.width),
                                     compHeight: Double(composition.height),
@@ -125,15 +125,36 @@ struct PreviewView: View {
                 let now = viewport.viewToComp(Vec2(x: Double(value.location.x), y: Double(value.location.y)))
                 var target = session.startPosition + (now - session.startPoint)
                 let threshold = 10.0 / max(viewport.scale, 0.001)
-                let snappedX = showAlignmentGuides && abs(target.x - Double(compositionWidth) / 2) <= threshold
-                let snappedY = showAlignmentGuides && abs(target.y - Double(compositionHeight) / 2) <= threshold
-                if snappedX { target.x = Double(compositionWidth) / 2 }
-                if snappedY { target.y = Double(compositionHeight) / 2 }
-                if (snappedX && !showingVerticalGuide) || (snappedY && !showingHorizontalGuide) {
-                    MotionStudioHaptics.impact(.light)
+                if showAlignmentGuides,
+                   let movingLayer = frame.layers.first(where: { $0.id == session.layerID }) {
+                    // Bounds are calculated from the transformed corners, so rotated and scaled
+                    // layers snap by their visible edges rather than only by their anchor point.
+                    let currentPosition = model.composition.layer(withID: session.layerID)?
+                        .vectorValue(.position, at: model.currentTime) ?? session.startPosition
+                    let offset = target - currentPosition
+                    let movingBounds = bounds(of: movingLayer, offset: offset)
+                    let otherBounds = frame.layers
+                        .filter { $0.id != session.layerID && isGuideEligible($0) }
+                        .map { bounds(of: $0, offset: .zero) }
+                    let xTargets = [0.0, Double(compositionWidth) / 2, Double(compositionWidth)] +
+                        otherBounds.flatMap { [$0.minX, $0.midX, $0.maxX] }
+                    let yTargets = [0.0, Double(compositionHeight) / 2, Double(compositionHeight)] +
+                        otherBounds.flatMap { [$0.minY, $0.midY, $0.maxY] }
+                    let xSnap = closestSnap(features: [movingBounds.minX, movingBounds.midX, movingBounds.maxX],
+                                            targets: xTargets, threshold: threshold)
+                    let ySnap = closestSnap(features: [movingBounds.minY, movingBounds.midY, movingBounds.maxY],
+                                            targets: yTargets, threshold: threshold)
+                    if let xSnap { target.x += xSnap.delta }
+                    if let ySnap { target.y += ySnap.delta }
+                    if (xSnap?.target != verticalGuidePosition) || (ySnap?.target != horizontalGuidePosition) {
+                        if xSnap != nil || ySnap != nil { MotionStudioHaptics.impact(.light) }
+                    }
+                    verticalGuidePosition = xSnap?.target
+                    horizontalGuidePosition = ySnap?.target
+                } else {
+                    verticalGuidePosition = nil
+                    horizontalGuidePosition = nil
                 }
-                showingVerticalGuide = snappedX
-                showingHorizontalGuide = snappedY
                 model.movePosition(of: session.layerID, to: target)
             }
             .onEnded { _ in
@@ -144,9 +165,57 @@ struct PreviewView: View {
                 }
                 session = nil
                 sessionStarted = false
-                showingVerticalGuide = false
-                showingHorizontalGuide = false
+                verticalGuidePosition = nil
+                horizontalGuidePosition = nil
             }
+    }
+
+    private struct LayerBounds {
+        var minX: Double
+        var midX: Double
+        var maxX: Double
+        var minY: Double
+        var midY: Double
+        var maxY: Double
+    }
+
+    private struct SnapMatch: Equatable {
+        var delta: Double
+        var target: Double
+    }
+
+    private func isGuideEligible(_ layer: ResolvedLayer) -> Bool {
+        switch layer.kind {
+        case .audio, .null, .adjustment: return false
+        default: return true
+        }
+    }
+
+    private func bounds(of layer: ResolvedLayer, offset: Vec2) -> LayerBounds {
+        let corners = [
+            Vec2(x: 0, y: 0), Vec2(x: layer.size.x, y: 0),
+            Vec2(x: 0, y: layer.size.y), Vec2(x: layer.size.x, y: layer.size.y)
+        ].map { layer.transform.applying(to: $0) + offset }
+        let xs = corners.map(\.x)
+        let ys = corners.map(\.y)
+        let minX = xs.min() ?? 0, maxX = xs.max() ?? 0
+        let minY = ys.min() ?? 0, maxY = ys.max() ?? 0
+        return LayerBounds(minX: minX, midX: (minX + maxX) / 2, maxX: maxX,
+                           minY: minY, midY: (minY + maxY) / 2, maxY: maxY)
+    }
+
+    private func closestSnap(features: [Double], targets: [Double], threshold: Double) -> SnapMatch? {
+        var best: SnapMatch?
+        for feature in features {
+            for target in targets {
+                let delta = target - feature
+                guard abs(delta) <= threshold else { continue }
+                if best == nil || abs(delta) < abs(best!.delta) {
+                    best = SnapMatch(delta: delta, target: target)
+                }
+            }
+        }
+        return best
     }
 
     private func drawAlignmentGuides(in context: inout GraphicsContext, viewport: Viewport) {
@@ -156,7 +225,7 @@ struct PreviewView: View {
         let height = viewport.compHeight * viewport.scale
         let frame = CGRect(x: origin.x, y: origin.y, width: width, height: height)
 
-        // Persistent composition guides: thirds plus a title/action-safe frame.
+        // Persistent thirds grid and safe-area frame.
         var grid = Path()
         for fraction in [1.0 / 3.0, 2.0 / 3.0] {
             let x = origin.x + width * fraction
@@ -173,17 +242,18 @@ struct PreviewView: View {
         context.stroke(Path(safe), with: .color(Theme.accent.opacity(0.45)),
                        style: StrokeStyle(lineWidth: 0.8, dash: [4, 4]))
 
-        // Strong, coloured snap guides appear while a layer is aligned to the composition centre.
+        // Live guides show the exact line the moving layer has snapped to: canvas borders,
+        // canvas centre, or an edge/centre of another visible layer.
         var snap = Path()
-        if showingVerticalGuide {
-            let x = frame.midX
-            snap.move(to: CGPoint(x: x, y: frame.minY))
-            snap.addLine(to: CGPoint(x: x, y: frame.maxY))
+        if let x = verticalGuidePosition {
+            let viewX = origin.x + x * viewport.scale
+            snap.move(to: CGPoint(x: viewX, y: frame.minY))
+            snap.addLine(to: CGPoint(x: viewX, y: frame.maxY))
         }
-        if showingHorizontalGuide {
-            let y = frame.midY
-            snap.move(to: CGPoint(x: frame.minX, y: y))
-            snap.addLine(to: CGPoint(x: frame.maxX, y: y))
+        if let y = horizontalGuidePosition {
+            let viewY = origin.y + y * viewport.scale
+            snap.move(to: CGPoint(x: frame.minX, y: viewY))
+            snap.addLine(to: CGPoint(x: frame.maxX, y: viewY))
         }
         context.stroke(snap, with: .color(Theme.accent),
                        style: StrokeStyle(lineWidth: 1.6, dash: [6, 3]))

@@ -22,6 +22,8 @@ public enum LayerKind: Codable, Equatable {
     case null
     /// Applies its enabled effects to visual layers beneath it in the stack.
     case adjustment
+    /// Editable freehand vector stroke in local layer coordinates.
+    case vectorPath(points: [Vec2])
 }
 
 /// One layer in a composition.
@@ -40,6 +42,12 @@ public struct Layer: Codable, Equatable, Identifiable {
     /// Size of the layer's content in composition pixels, before scale.
     public var size: Vec2
     public var fill: RGBA
+    /// Optional timeline-only swatch; does not affect the rendered clip. Nil uses the clip fill.
+    public var timelineColor: RGBA?
+    /// Audio playback gain, clamped to 0...1. Ignored by visual layers.
+    public var audioVolume: Double
+    /// Source-media offset in seconds, used when a clip is split into segments.
+    public var sourceOffsetSeconds: Double
     /// The layer exists from `inPoint` up to (not including) `outPoint`.
     public var inPoint: Time
     public var outPoint: Time
@@ -63,6 +71,9 @@ public struct Layer: Codable, Equatable, Identifiable {
                 textFontName: String? = nil,
                 size: Vec2,
                 fill: RGBA,
+                timelineColor: RGBA? = nil,
+                audioVolume: Double = 1,
+                sourceOffsetSeconds: Double = 0,
                 inPoint: Time,
                 outPoint: Time,
                 playbackSpeed: Double = 1,
@@ -81,6 +92,9 @@ public struct Layer: Codable, Equatable, Identifiable {
         self.textFontName = textFontName
         self.size = size
         self.fill = fill
+        self.timelineColor = timelineColor
+        self.audioVolume = min(max(audioVolume.isFinite ? audioVolume : 1, 0), 1)
+        self.sourceOffsetSeconds = max(0, sourceOffsetSeconds.isFinite ? sourceOffsetSeconds : 0)
         self.inPoint = inPoint
         self.outPoint = outPoint
         self.playbackSpeed = min(max(playbackSpeed.isFinite ? playbackSpeed : 1, 0.1), 4)
@@ -98,7 +112,7 @@ public struct Layer: Codable, Equatable, Identifiable {
     // MARK: Saving. Fields added after version 1 use decodeIfPresent so older files still open.
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, kind, textFontName, size, fill, inPoint, outPoint, playbackSpeed
+        case id, name, kind, textFontName, size, fill, timelineColor, audioVolume, sourceOffsetSeconds, inPoint, outPoint, playbackSpeed
         case position, scale, anchor, rotation, opacity
         case blendMode, parentID, isVisible, effects
     }
@@ -111,6 +125,9 @@ public struct Layer: Codable, Equatable, Identifiable {
         textFontName = try c.decodeIfPresent(String.self, forKey: .textFontName)
         size = try c.decode(Vec2.self, forKey: .size)
         fill = try c.decode(RGBA.self, forKey: .fill)
+        timelineColor = try c.decodeIfPresent(RGBA.self, forKey: .timelineColor)
+        audioVolume = min(max(try c.decodeIfPresent(Double.self, forKey: .audioVolume) ?? 1, 0), 1)
+        sourceOffsetSeconds = max(0, try c.decodeIfPresent(Double.self, forKey: .sourceOffsetSeconds) ?? 0)
         inPoint = try c.decode(Time.self, forKey: .inPoint)
         outPoint = try c.decode(Time.self, forKey: .outPoint)
         playbackSpeed = min(max(try c.decodeIfPresent(Double.self, forKey: .playbackSpeed) ?? 1, 0.1), 4)

@@ -144,17 +144,27 @@ final class PersistenceTests: XCTestCase {
                           inPoint: .zero, outPoint: duration, position: project.rootComposition.center)
         let audio = Layer(name: "Sound", kind: .audio(assetID: audioID),
                           size: Vec2(x: 1920, y: 1), fill: .white,
+                          timelineColor: RGBA(r: 0.9, g: 0.2, b: 0.3), audioVolume: 0.42, sourceOffsetSeconds: 3.25,
                           inPoint: .zero, outPoint: duration, position: project.rootComposition.center)
         let text = Layer(name: "Title", kind: .text("Hello"), textFontName: "Example-Regular",
                          size: Vec2(x: 500, y: 100), fill: .white,
                          inPoint: .zero, outPoint: duration, position: project.rootComposition.center)
+        let drawing = Layer(name: "Stroke", kind: .vectorPath(points: [Vec2(x: 0, y: 0), Vec2(x: 30, y: 45)]),
+                            size: Vec2(x: 30, y: 45), fill: .white, inPoint: .zero,
+                            outPoint: duration, position: project.rootComposition.center)
         try project.updateComposition(compID) { composition in
-            composition.layers.append(contentsOf: [video, audio, text])
+            composition.layers.append(contentsOf: [video, audio, text, drawing])
         }
         let decoded = try ProjectFile.decode(ProjectFile.encode(project))
         let layers = decoded.rootComposition.layers
         XCTAssertTrue(layers.contains { $0.kind == .video(assetID: videoID) })
         XCTAssertTrue(layers.contains { $0.kind == .audio(assetID: audioID) })
+        let decodedAudio = try XCTUnwrap(layers.first { $0.name == "Sound" })
+        XCTAssertEqual(decodedAudio.audioVolume, 0.42, accuracy: 1e-6)
+        XCTAssertEqual(decodedAudio.sourceOffsetSeconds, 3.25, accuracy: 1e-6)
+        XCTAssertEqual(decodedAudio.timelineColor, RGBA(r: 0.9, g: 0.2, b: 0.3))
+        let decodedDrawing = try XCTUnwrap(layers.first { $0.name == "Stroke" })
+        XCTAssertEqual(decodedDrawing.kind, .vectorPath(points: [Vec2(x: 0, y: 0), Vec2(x: 30, y: 45)]))
         let decodedText = try XCTUnwrap(layers.first { $0.name == "Title" })
         XCTAssertEqual(decodedText.kind, .text("Hello"))
         XCTAssertEqual(decodedText.textFontName, "Example-Regular")

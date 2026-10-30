@@ -153,6 +153,7 @@ enum VideoFrameExporter {
         try destinationVideo.insertTimeRange(CMTimeRange(start: .zero, duration: videoAsset.duration),
                                              of: sourceVideo, at: .zero)
         var insertedAudio = false
+        var audioMixParameters: [AVAudioMixInputParameters] = []
         for (layer, assetID, isVideo) in audioLayers where layer.isVisible {
             guard let asset = assets.first(where: { $0.id == assetID }),
                   let url = ProjectMedia.fileURL(for: asset, inProjectFolder: projectFolder) else { continue }
@@ -161,7 +162,8 @@ enum VideoFrameExporter {
                   let destinationTrack = composition.addMutableTrack(withMediaType: .audio,
                                                                        preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
             let clipLength = max(0, layer.outPoint.seconds - layer.inPoint.seconds)
-            let sourceStart = isVideo ? max(0, layer.inPoint.seconds) : 0
+            let sourceStart = isVideo && layer.sourceOffsetSeconds == 0
+                ? max(0, layer.inPoint.seconds) : max(0, layer.sourceOffsetSeconds)
             let available = max(0, source.duration.seconds - sourceStart)
             let duration = min(clipLength, available)
             guard duration > 0 else { continue }
@@ -172,21 +174,29 @@ enum VideoFrameExporter {
                     of: sourceTrack,
                     at: CMTime(seconds: layer.inPoint.seconds, preferredTimescale: 600))
                 insertedAudio = true
+                let mixParameters = AVMutableAudioMixInputParameters(track: destinationTrack)
+                mixParameters.setVolume(Float(layer.audioVolume), at: CMTime(seconds: layer.inPoint.seconds, preferredTimescale: 600))
+                audioMixParameters.append(mixParameters)
             } catch {
                 // Keep exporting other audio clips; a malformed optional clip should not lose the video.
                 continue
             }
         }
-        // Passthrough muxing keeps the bitrate selected above instead of silently transcoding
-        // the finished video with a second, unrelated quality preset.
+        // Applying per-layer gain requires an audio mix, so the final mux pass re-encodes the
+        // composition at the system's high-quality preset instead of using passthrough.
         guard insertedAudio,
-              let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough) else {
+              let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             return output
         }
         let muxed = FileManager.default.temporaryDirectory
             .appendingPathComponent("MotionStudio-Final-\(UUID().uuidString).mp4")
         exporter.outputURL = muxed
         exporter.outputFileType = .mp4
+        if !audioMixParameters.isEmpty {
+            let audioMix = AVMutableAudioMix()
+            audioMix.inputParameters = audioMixParameters
+            exporter.audioMix = audioMix
+        }
         exporter.shouldOptimizeForNetworkUse = true
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             exporter.exportAsynchronously {

@@ -132,7 +132,11 @@ public enum Evaluator {
             if let blur = resolvedEffects.first(where: { $0.effectID == "motion-blur" }) {
                 let shutter = min(720, max(0, blur.values["shutterAngle"]?.first ?? 180)) / 360
                 let requestedSamples = Int(blur.values["samples"]?.first ?? 8)
-                let sampleCount = min(16, max(2, requestedSamples))
+                let quality = Int((blur.values["quality"]?.first ?? 1).rounded())
+                let qualityCap = [4, 8, 16][min(max(quality, 0), 2)]
+                let sampleCount = min(qualityCap, min(16, max(2, requestedSamples)))
+                let angleRadians = (blur.values["angle"]?.first ?? 0) * Double.pi / 180
+                let directionalBias = shutter * 6.0
                 let halfWindow = (1.0 / composition.frameRate.framesPerSecond) * shutter * 0.5
                 if halfWindow > 0.0001 {
                     // Sample both sides of the current time. This captures actual keyframed
@@ -142,8 +146,14 @@ public enum Evaluator {
                         let sampleTicks = time.ticks + Int64((fraction * halfWindow * Double(Time.ticksPerSecond)).rounded())
                         let sampleTime = Time(ticks: min(max(sampleTicks, layer.inPoint.ticks), max(layer.inPoint.ticks, layer.outPoint.ticks - 1)))
                         if sampleTime == time { continue }
-                        let sampled = worldTransform(of: layer, at: sampleTime, layersByID: layersByID)
-                        if sampled != transform { blurTransforms.append(sampled) }
+                        var sampled = worldTransform(of: layer, at: sampleTime, layersByID: layersByID)
+                        if sampled != transform {
+                            // The angle setting biases an existing motion trail along a chosen direction.
+                            // A static image remains crisp because the bias is never added without movement.
+                            sampled.tx += cos(angleRadians) * directionalBias * fraction
+                            sampled.ty += sin(angleRadians) * directionalBias * fraction
+                            blurTransforms.append(sampled)
+                        }
                     }
                     blurTrailOpacity = min(0.22, max(0.04, 0.7 / Double(blurTransforms.count + 1)))
                 }
@@ -160,7 +170,7 @@ public enum Evaluator {
                 effects: resolvedEffects,
                 motionBlurTransforms: blurTransforms,
                 motionBlurTrailOpacity: blurTrailOpacity,
-                videoSourceTimeSeconds: { if case .video = layer.kind, layer.effects.contains(where: { $0.effectID == "optical-flow-slow-motion" && $0.isEnabled }) { return max(0, Double(time.ticks - layer.inPoint.ticks) / Double(Time.ticksPerSecond) * layer.playbackSpeed) }; return nil }(),
+                videoSourceTimeSeconds: { if case .video = layer.kind, layer.effects.contains(where: { $0.effectID == "optical-flow-slow-motion" && $0.isEnabled }) { return max(0, layer.sourceOffsetSeconds + Double(time.ticks - layer.inPoint.ticks) / Double(Time.ticksPerSecond) * layer.playbackSpeed) }; return nil }(),
                 playbackSpeed: layer.playbackSpeed))
         }
 

@@ -89,6 +89,52 @@ final class ImageEffectTests: XCTestCase {
 
     // MARK: 1. Brightness / Contrast
 
+    func testColorTuneCombinesHueSaturationAndBrightness() {
+        let red = solid(1, 1, 1, 0, 0, 0.6)
+        XCTAssertEqual(run("color-tune", red), red, "default settings must be identity")
+        expectPixel(run("color-tune", red, ["hue": [120]]), 0, 0, 0, 1, 0, 0.6)
+        let desaturated = run("color-tune", red, ["saturation": [0]])
+        let grey = desaturated.straight(0, 0)
+        XCTAssertEqual(grey.r, grey.g, accuracy: 1e-4)
+        XCTAssertEqual(grey.g, grey.b, accuracy: 1e-4)
+        XCTAssertEqual(grey.a, 0.6, accuracy: 1e-4)
+    }
+
+    func testDuotoneMapsBlackAndWhiteToConfiguredEndpointColours() {
+        let source = PixelImage(width: 2, height: 1)
+        var image = source
+        image.setStraight(0, 0, r: 0, g: 0, b: 0, a: 1)
+        image.setStraight(1, 0, r: 1, g: 1, b: 1, a: 1)
+        let result = run("duotone", image, ["shadowRed": [0.1], "shadowGreen": [0.2], "shadowBlue": [0.3],
+                                            "highlightRed": [0.9], "highlightGreen": [0.8], "highlightBlue": [0.7]])
+        expectPixel(result, 0, 0, 0.1, 0.2, 0.3)
+        expectPixel(result, 1, 0, 0.9, 0.8, 0.7)
+    }
+
+    func testGlitchLinesPreservesFrameSizeAndAlpha() {
+        let source = solid(8, 8, 0.2, 0.4, 0.6, 0.7)
+        let result = run("glitch-lines", source, ["amount": [5], "spacing": [2], "phase": [1]])
+        XCTAssertEqual(result.width, source.width)
+        XCTAssertEqual(result.height, source.height)
+        XCTAssertEqual(result.straight(3, 3).a, 0.7, accuracy: 1e-4)
+    }
+
+    func testBloomIsConnectedAndProducesAFrame() {
+        let source = solid(8, 8, 1, 1, 1)
+        let result = run("bloom", source)
+        XCTAssertFalse(result.isEmpty)
+        XCTAssertTrue(EffectRegistry.isAvailable(id: "bloom"))
+    }
+
+    func testGlowScanIsConnectedAndProducesAFrame() {
+        let source = solid(8, 8, 1, 1, 1)
+        let result = run("glow-scan", source)
+        XCTAssertFalse(result.isEmpty)
+        XCTAssertGreaterThanOrEqual(result.width, source.width)
+        XCTAssertGreaterThanOrEqual(result.height, source.height)
+        XCTAssertTrue(EffectRegistry.isAvailable(id: "glow-scan"))
+    }
+
     func testBrightnessAndContrast() {
         let image = solid(1, 1, 0.75, 0.5, 0.25)
         expectPixel(run("brightness-contrast", image, ["brightness": [0.1]]), 0, 0, 0.85, 0.6, 0.35)

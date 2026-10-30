@@ -270,7 +270,7 @@ private struct LayerRow: View {
 
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(layer.fill.color.opacity(layer.isVisible ? 0.56 : 0.22))
+                    .fill((layer.timelineColor ?? layer.fill).color.opacity(layer.isVisible ? 0.72 : 0.22))
                     .frame(width: barWidth, height: rowHeight - 16)
                     .offset(x: start)
                     .contentShape(Rectangle())

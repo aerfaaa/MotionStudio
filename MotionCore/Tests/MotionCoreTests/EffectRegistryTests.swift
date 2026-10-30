@@ -16,7 +16,7 @@ final class EffectRegistryTests: XCTestCase {
         // These additional mobile-focused effects are intentionally outside the base required list.
         let extras = Set(names).subtracting(requiredEffectNames)
         XCTAssertEqual(extras, ["Drop Shadow", "Luma Fade", "VHS", "Pixel Sort", "RGB Blur", "Motion Tile",
-                                "Black & White", "Sepia Tone", "Solarize", "Tint", "Chromatic Aberration", "Film Grain", "Scanlines", "Liquid Glass", "Radial Blur", "Optical Flow Slow Motion"])
+                                "Black & White", "Sepia Tone", "Solarize", "Tint", "Chromatic Aberration", "Film Grain", "Scanlines", "Liquid Glass", "Radial Blur", "Optical Flow Slow Motion", "Bloom", "Duotone", "Glitch Lines"])
     }
 
     func testSpecialCharactersInNamesArePreserved() {

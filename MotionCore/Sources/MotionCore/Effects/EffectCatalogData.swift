@@ -191,5 +191,8 @@ enum EffectCatalogData {
         ("Scanlines", .stylize),
         ("Liquid Glass", .distort),
         ("Radial Blur", .blurSharpen),
+        ("Bloom", .light),
+        ("Duotone", .color),
+        ("Glitch Lines", .stylize),
     ]
 }

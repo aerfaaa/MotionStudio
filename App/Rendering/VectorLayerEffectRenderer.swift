@@ -78,6 +78,17 @@ enum VectorLayerEffectRenderer {
             case .shape(.ellipse):
                 context.setFillColor(color.cgColor)
                 context.fillEllipse(in: rect)
+            case .vectorPath(let points):
+                guard points.count >= 2 else { break }
+                let path = UIBezierPath()
+                path.move(to: CGPoint(x: points[0].x, y: points[0].y))
+                for point in points.dropFirst() { path.addLine(to: CGPoint(x: point.x, y: point.y)) }
+                context.setStrokeColor(color.cgColor)
+                context.setLineWidth(4)
+                context.setLineCap(.round)
+                context.setLineJoin(.round)
+                context.addPath(path.cgPath)
+                context.strokePath()
             case .text(let content):
                 let fontSize = max(12, rect.height * 0.7)
                 let font = layer.textFontName.flatMap { UIFont(name: $0, size: fontSize) } ?? UIFont.systemFont(ofSize: fontSize, weight: .medium)

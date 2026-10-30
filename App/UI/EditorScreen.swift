@@ -33,6 +33,7 @@ struct EditorScreen: View {
     @AppStorage("showAlignmentGuides") private var showAlignmentGuides = true
     @State private var dragStartHeight: CGFloat?
     @State private var showingCompositionSettings = false
+    @State private var showingVectorDrawing = false
     @State private var sideTab: SideTab = .properties
     @State private var showingPhotoPicker = false
     @State private var showingFileImporter = false
@@ -99,6 +100,11 @@ struct EditorScreen: View {
         .onChange(of: isExportingVideo) { _, exporting in
             if exporting { previewRenderTask?.cancel() }
             else { startPreviewRendering(delay: true) }
+        }
+        .sheet(isPresented: $showingVectorDrawing) {
+            VectorDrawingSheet(compositionWidth: model.composition.width, compositionHeight: model.composition.height) { points in
+                model.addVectorDrawing(points: points)
+            }
         }
         .sheet(isPresented: $showingCompositionSettings) {
             CompositionSettingsSheet(model: model)
@@ -453,6 +459,7 @@ struct EditorScreen: View {
                 Button { MotionStudioHaptics.selection(); showingFileImporter = true } label: { Label("From Files", systemImage: "folder") }
             }
             Section("New layer") {
+                Button { showingVectorDrawing = true } label: { Label("Vector Drawing", systemImage: "scribble.variable") }
                 Button { model.addLayer(.rectangle) } label: { Label("Rectangle", systemImage: "rectangle") }
                 Button { model.addLayer(.ellipse) } label: { Label("Ellipse", systemImage: "circle") }
                 Button { model.addLayer(.solid) } label: { Label("Solid", systemImage: "square.fill") }

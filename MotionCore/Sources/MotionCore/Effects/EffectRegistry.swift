@@ -30,7 +30,7 @@ public enum EffectRegistry {
     /// Vector layers are rasterized by the app renderer before the same pixel effect pipeline is used.
     public static func applicabilityMessage(for kind: LayerKind) -> String? {
         switch kind {
-        case .image, .video, .solid, .shape, .text, .adjustment:
+        case .image, .video, .solid, .shape, .text, .adjustment, .vectorPath:
             return nil
         case .audio:
             return "Audio clips do not have visual effects."
