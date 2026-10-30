@@ -506,15 +506,19 @@ struct SettingsSheet: View {
                 } footer: {
                     Text("Changes the timeline playhead, selected controls and accent highlights. It is saved on this device, not inside individual projects.")
                 }
-                Section("Editing") {
+                                Section {
                     Toggle("Haptic feedback", isOn: $hapticsEnabled)
                     Toggle("Alignment and snapping guides", isOn: $showAlignmentGuides)
                     Toggle("Snap clips together", isOn: $clipEdgeSnapping)
+                } header: {
+                    Text("Editing")
                 } footer: {
                     Text("Haptics apply to supported buttons, keyframe controls, layer reordering and clip-edge snapping. Guides include composition thirds, safe margins and coloured centre-snap lines. Clip snapping aligns a dragged clip's start or end to another clip's edge, the composition bounds, or a frame boundary.")
                 }
-                Section("Export") {
+                               Section {
                     Toggle("Save exports to Photos automatically", isOn: $saveExportsToPhotos)
+                } header: {
+                    Text("Export")
                 } footer: {
                     Text("When enabled, completed video and still exports are added to Photos. MotionStudio requests add-only Photos access the first time you export.")
                 }

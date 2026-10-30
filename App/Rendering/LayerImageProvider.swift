@@ -89,8 +89,8 @@ final class LayerImageProvider {
     private static let processedCostLimit = 96 * 1024 * 1024
     // Decoded frames are cheaper than processed frames, but still bounded to avoid unbounded memory.
     private static let sourceCacheLimit = 72
-    private static let largestPreviewSide = 448
-    private static let playbackPreviewSide = 288
+    private static let largestPreviewSide = 512
+    private static let playbackPreviewSide = 320
     private static let playbackVideoFPS: Int64 = 24
 
     var isBusy: Bool { !loadingSources.isEmpty || !runningKeys.isEmpty || !wanted.isEmpty || !wantedVideoSources.isEmpty }
@@ -180,7 +180,11 @@ final class LayerImageProvider {
         let mappedVideoTicks = isVideo ? Int64(max(0, (layer.videoSourceTimeSeconds ?? time.seconds) * Double(MotionCore.Time.ticksPerSecond)).rounded()) : nil
         let videoTicks = isVideo ? (playbackPreview ? quantizedVideoTicks(mappedVideoTicks ?? time.ticks) : mappedVideoTicks) : nil
         if isVideo, let videoTicks { requestedVideoFrameTicks[assetID] = videoTicks }
-        let flowEnabled = isVideo && layer.effects.contains(where: { $0.effectID == "optical-flow-slow-motion" && $0.isEnabled }) && layer.playbackSpeed < 0.999
+               let flowEnabled = isVideo
+            && layer.effects.contains(where: {
+                $0.effectID == "optical-flow-slow-motion"
+            })
+            && layer.playbackSpeed < 0.999
         let sourceKey = SourceKey(assetID: assetID, maxPixel: maxPixel, frameTicks: videoTicks,
                                   exactVideoFrame: isVideo && exactVideoFrame,
                                   interpolateSlowMotion: flowEnabled && exactVideoFrame)
